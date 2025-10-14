@@ -1,0 +1,260 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  .signin-container {
+    display: flex;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    width: 100vw;
+  }
+  
+.left-section {
+    flex: 0 0 70%;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+/* shared image cover helper */
+.image-cover {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+  
+.illustration-container { display: none; }
+  
+  .right-section {
+    flex: 0 0 30%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+    background: #ffffff;
+  }
+  
+  .signin-form-container {
+    max-width: 400px;
+    width: 100%;
+  }
+  
+  .signin-title {
+    font-size: 32px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  
+  .google-signin-btn {
+    width: 100%;
+    padding: 12px 16px;
+    background: #007BFF;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    transition: background 0.2s;
+  }
+  
+  .google-signin-btn:hover {
+    background: #0056b3;
+  }
+  
+  .google-icon {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .divider {
+    display: flex;
+    align-items: center;
+    margin: 24px 0;
+  }
+  
+  .divider-line {
+    flex: 1;
+    height: 1px;
+    background: #e1e1e1;
+  }
+  
+  .divider-text {
+    padding: 0 16px;
+    color: #666;
+    font-size: 14px;
+  }
+  
+  .signin-form {
+    margin-bottom: 24px;
+  }
+  
+  .form-group {
+    margin-bottom: 24px;
+  }
+  
+  .form-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 8px;
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 16px;
+    color: #333;
+    background: #ffffff;
+    transition: border-color 0.2s;
+  }
+  
+  .form-input:focus {
+    outline: none;
+    border-color: #007BFF;
+  }
+  
+  .form-input::placeholder {
+    color: #999;
+  }
+  
+  .password-input-container {
+    position: relative;
+  }
+  
+  .password-input {
+    padding-right: 50px;
+  }
+  
+  .password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px;
+  }
+  
+  .forgot-password {
+    color: #007BFF;
+    text-decoration: none;
+    font-size: 14px;
+    margin-top: 8px;
+    display: inline-block;
+  }
+  
+  .forgot-password:hover {
+    text-decoration: underline;
+  }
+  
+  .signin-btn {
+    width: 100%;
+    padding: 12px 16px;
+    background: #007BFF;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  
+  .signin-btn:hover {
+    background: #0056b3;
+  }
+  
+  .signup-link {
+    text-align: center;
+    color: #666;
+    font-size: 14px;
+  }
+  
+  .signup-link a {
+    color: #007BFF;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .signup-link a:hover {
+    text-decoration: underline;
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 1024px) {
+    .signin-container {
+      flex-direction: column;
+    }
+    
+    .left-section {
+      min-height: 300px;
+      flex: none;
+    }
+    
+    .right-section {
+      flex: none;
+      padding: 32px 24px;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .left-section {
+      padding: 24px;
+      min-height: 250px;
+    }
+    
+    .right-section {
+      padding: 24px 20px;
+    }
+    
+    .signin-title {
+      font-size: 28px;
+      margin-bottom: 24px;
+    }
+    
+    .signin-form-container {
+      max-width: 100%;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .left-section {
+      min-height: 200px;
+      padding: 16px;
+    }
+    
+    .right-section {
+      padding: 16px;
+    }
+    
+    .signin-title {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    
+    .google-signin-btn,
+    .signin-btn {
+      padding: 14px 16px;
+      font-size: 15px;
+    }
+  }

@@ -12,10 +12,10 @@ const isDevelopment = import.meta.env.DEV;
 const envApiUrl = import.meta.env.VITE_API_BASE_URL;
 
 // In development, use empty string to leverage Vite proxy
-// In production, use environment variable or fallback
+// In production, use proxy through Vercel or direct backend
 export const API_BASE = isDevelopment
   ? ""
-  : envApiUrl || "https://ai-resume-builder-backend-uhdm.onrender.com/api/v1";
+  : envApiUrl || "/api/v1";
 
 // Log configuration in development
 if (isDevelopment) {
@@ -28,6 +28,7 @@ if (isDevelopment) {
   console.log("🔧 API Config:", {
     mode: "production",
     baseURL: API_BASE,
+    proxy: "Vercel proxy to backend",
     backend: "https://ai-resume-builder-backend-uhdm.onrender.com",
   });
 }

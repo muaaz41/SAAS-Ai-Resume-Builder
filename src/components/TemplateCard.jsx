@@ -9,6 +9,38 @@ const TemplateCard = ({ template, isPremium = false, onSelect, onPreview }) => {
   const tags = template?.tags || [];
   const name = template?.name || template?.slug || "Template";
   const slug = template?.slug || "default";
+  // Resolve thumbnail URL to a reliable absolute/relative path that works in all envs
+  const rawThumb =
+    typeof template?.thumbnailUrl === "string" && template.thumbnailUrl.length > 0
+      ? template.thumbnailUrl
+      : null;
+
+  const thumbnailSrc = React.useMemo(() => {
+    if (!rawThumb) return null;
+    const url = rawThumb.trim();
+    // Absolute URL already
+    if (/^https?:\/\//i.test(url)) return url;
+    // Already proxied path like /api/v1/...
+    if (url.startsWith("/api/")) return url;
+    if (url.startsWith("/")) return url; // same-origin absolute path
+    // Bare path like templates/.../thumbnail -> prefix API root
+    return `/api/v1/${url.replace(/^\/+/, "")}`;
+  }, [rawThumb]);
+
+  // Resolve preview URL similarly; prefer preview iframe for most accurate visual
+  const rawPreview =
+    typeof template?.previewUrl === "string" && template.previewUrl.length > 0
+      ? template.previewUrl
+      : null;
+
+  const previewSrc = React.useMemo(() => {
+    if (!rawPreview) return null;
+    const url = rawPreview.trim();
+    if (/^https?:\/\//i.test(url)) return url;
+    if (url.startsWith("/api/")) return url;
+    if (url.startsWith("/")) return url;
+    return `/api/v1/${url.replace(/^\/+/, "")}`;
+  }, [rawPreview]);
 
   // Generate unique layout based on template slug
   const getTemplateLayout = (slug) => {
@@ -111,14 +143,14 @@ const TemplateCard = ({ template, isPremium = false, onSelect, onPreview }) => {
         </div>
       )}
 
-      {/* Template Preview Mockup */}
+      {/* Template Preview Area (uses real thumbnail when available) */}
       <div
         className="preview-mockup"
         style={{
           height: "240px",
           background: `linear-gradient(135deg, ${accentColor}08, ${accentColor}02)`,
           borderRadius: "12px",
-          padding: "16px",
+          padding: thumbnailSrc ? 0 : "16px",
           marginBottom: "16px",
           display: "flex",
           flexDirection: "column",
@@ -127,6 +159,40 @@ const TemplateCard = ({ template, isPremium = false, onSelect, onPreview }) => {
           overflow: "hidden",
           border: `1px solid ${accentColor}20`,
         }}>
+        {previewSrc ? (
+          <iframe
+            title={`${name} preview`}
+            src={previewSrc}
+            sandbox="allow-same-origin"
+            loading="lazy"
+            style={{
+              width: "100%",
+              height: "100%",
+              border: "0",
+              display: "block",
+              borderRadius: "12px",
+              background: "#fff",
+              pointerEvents: "none",
+            }}
+          />
+        ) : thumbnailSrc ? (
+          <img
+            src={thumbnailSrc}
+            alt={`${name} thumbnail`}
+            loading="lazy"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+              borderRadius: "12px",
+            }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+        <>
         {/* Shimmer Effect */}
         <div
           style={{
@@ -602,6 +668,8 @@ const TemplateCard = ({ template, isPremium = false, onSelect, onPreview }) => {
               />
             </div>
           </>
+        )}
+        </>
         )}
       </div>
 

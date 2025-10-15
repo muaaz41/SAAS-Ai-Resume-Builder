@@ -45,7 +45,7 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              <Link className="btn-outline" to="/signup">
+              <Link className="btn-solid" to="/signup">
                 Sign Up
               </Link>
               <Link className="btn-solid" to="/signin">

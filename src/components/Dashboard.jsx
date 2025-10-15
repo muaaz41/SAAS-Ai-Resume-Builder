@@ -21,6 +21,15 @@ export default function Dashboard() {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
+  // Theme-aware colors
+  const isDark =
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const THEME = isDark
+    ? { text: "#e5e7eb", sub: "#cbd5e1", muted: "#94a3b8", border: "#334155", inputBg: "#0b1220" }
+    : { text: "#0f172a", sub: "#475569", muted: "#64748b", border: "#cbd5e1", inputBg: "#ffffff" };
+
   useEffect(() => {
     (async () => {
       try {
@@ -149,6 +158,7 @@ export default function Dashboard() {
         />
       )}
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "16px" }}>
+        <style>{`#template-search::placeholder{color:${THEME.muted}}`}</style>
         <div
           style={{
             display: "flex",
@@ -191,15 +201,15 @@ export default function Dashboard() {
                   fontSize: 24,
                   fontWeight: 700,
                   margin: 0,
-                  color: "#0f172a",
+                  color: THEME.inputBg,
                 }}>
                 Professional Templates
               </h2>
-              <p style={{ fontSize: 14, color: "#64748b", margin: "4px 0 0" }}>
+              <p style={{ fontSize: 14, color: THEME.inputBg, margin: "4px 0 0" }}>
                 Choose from {templates.length} professionally designed resume
                 templates
                 <br />
-                <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                <span style={{ fontSize: 12, color: THEME.inputBg }}>
                   Each template has a unique layout optimized for different
                   industries
                 </span>
@@ -213,21 +223,23 @@ export default function Dashboard() {
                   onChange={(e) => setSearch(e.target.value)}
                   style={{
                     padding: "12px 16px 12px 40px",
-                    border: "1px solid #cbd5e1",
+                    border: `1px solid ${THEME.border}`,
                     borderRadius: 12,
                     width: 280,
                     fontSize: 14,
-                    background: "#fff",
+                    background: THEME.inputBg,
+                    color: THEME.text,
                     outline: "none",
                     transition: "all 0.2s",
                   }}
+                  id="template-search"
                   onFocus={(e) => {
                     e.target.style.borderColor = "#2563eb";
                     e.target.style.boxShadow =
-                      "0 0 0 3px rgba(37, 99, 235, 0.1)";
+                      "0 0 0 3px rgba(37, 99, 235, 0.25)";
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = "#cbd5e1";
+                    e.target.style.borderColor = THEME.border;
                     e.target.style.boxShadow = "none";
                   }}
                 />
@@ -237,7 +249,7 @@ export default function Dashboard() {
                     left: 12,
                     top: "50%",
                     transform: "translateY(-50%)",
-                    color: "#64748b",
+                    color: THEME.muted,
                     fontSize: 16,
                   }}>
                   🔍
@@ -248,14 +260,17 @@ export default function Dashboard() {
                 onChange={(e) => setCategory(e.target.value)}
                 style={{
                   padding: "12px 16px",
-                  border: "1px solid #cbd5e1",
+                  border: `1px solid ${THEME.border}`,
                   borderRadius: 12,
                   fontSize: 14,
-                  background: "#fff",
+                  background: THEME.inputBg,
+                  color: THEME.text,
                   cursor: "pointer",
                   outline: "none",
                   minWidth: 120,
-                }}>
+                }}
+                id="template-category"
+              >
                 <option value="all">All Templates</option>
                 <option value="free">Free Templates</option>
                 <option value="premium">Premium Templates</option>

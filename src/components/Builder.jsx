@@ -128,6 +128,78 @@ export default function Builder() {
 
   const [resume, setResume] = useState(getInitialResumeData);
 
+  // Local state for skills input so commas work naturally
+  const [skillsInput, setSkillsInput] = useState("");
+
+  // Do not mirror skills back into the input; we keep it user-driven and clear on add
+
+  const commitSkillToken = (raw) => {
+    const token = (raw || skillsInput).trim();
+    if (!token) return;
+    setResume((r) => {
+      const existing = (r.skills || []).map((x) => x.name || x);
+      if (existing.includes(token)) return r; // avoid duplicates
+      return {
+        ...r,
+        skills: [
+          ...existing.map((n) => ({ name: n })),
+          { name: token },
+        ],
+      };
+    });
+    setSkillsInput("");
+    markTyping();
+  };
+
+  const removeSkill = (name) => {
+    setResume((r) => ({
+      ...r,
+      skills: (r.skills || [])
+        .map((x) => (typeof x === "string" ? { name: x } : x))
+        .filter((x) => (x.name || "") !== name),
+    }));
+    markTyping();
+  };
+
+  // Helper: attempt to show native date picker when supported
+  const openNativeDatePicker = (event) => {
+    const el = event?.currentTarget || event?.target;
+    if (el && typeof el.showPicker === "function") {
+      try {
+        el.showPicker();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  };
+
+  // ---------- theme (light/dark) ----------
+  const isDark =
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const THEME = isDark
+    ? {
+        pageBg: "linear-gradient(180deg,#0b1220,#0b1220 40%,#0b1220 100%)",
+        cardBg: "#0f172a",
+        panelBg: "#0b1220",
+        border: "#334155",
+        text: "#e5e7eb",
+        sub: "#94a3b8",
+        muted: "#94a3b8",
+        inputBg: "#0b1220",
+      }
+    : {
+        pageBg: "linear-gradient(180deg,#fff,#f8fafc 40%,#f1f5f9 100%)",
+        cardBg: "#ffffff",
+        panelBg: "#f8fafc",
+        border: "#e5e7eb",
+        text: "#0f172a",
+        sub: "#64748b",
+        muted: "#64748b",
+        inputBg: "#ffffff",
+      };
+
   // ---------- styles (unchanged) ----------
   const S = {
     page: {
@@ -135,30 +207,32 @@ export default function Builder() {
       gridTemplateColumns: "minmax(720px, 860px) minmax(480px, 640px)",
       gap: 24,
       height: "calc(100vh - 64px)",
-      background: "linear-gradient(180deg,#fff,#f8fafc 40%,#f1f5f9 100%)",
+      background: THEME.pageBg,
       padding: "24px 24px 32px",
     },
     left: {
-      background: "#fff",
+      background: THEME.cardBg,
       borderRadius: 12,
       padding: 24,
-      border: "1px solid #e5e7eb",
+      border: `1px solid ${THEME.border}`,
       overflow: "auto",
+      color: THEME.text,
     },
     rightWrap: {
-      background: "#f8fafc",
+      background: THEME.panelBg,
       borderRadius: 12,
-      border: "1px solid #e5e7eb",
+      border: `1px solid ${THEME.border}`,
       padding: 16,
       display: "grid",
       gridTemplateRows: "48px 1fr",
+      color: THEME.text,
     },
-    headerTitle: { fontSize: 22, fontWeight: 700, margin: 0, color: "#0f172a" },
-    headerSub: { marginTop: 6, color: "#64748b", fontSize: 14 },
+    headerTitle: { fontSize: 22, fontWeight: 700, margin: 0, color: THEME.text },
+    headerSub: { marginTop: 6, color: THEME.sub, fontSize: 14 },
     grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
     label: {
       fontSize: 12,
-      color: "#475569",
+      color: THEME.sub,
       marginBottom: 6,
       display: "block",
     },
@@ -166,32 +240,37 @@ export default function Builder() {
       width: "100%",
       padding: "12px 12px",
       borderRadius: 10,
-      border: "1px solid #cbd5e1",
-      background: "#fff",
+      border: `1px solid ${THEME.border}`,
+      background: THEME.inputBg,
       outline: "none",
       fontSize: 14,
+      color: THEME.text,
     },
     dateInput: {
       width: "100%",
       padding: "12px 12px",
       borderRadius: 10,
       border: "2px solid #3b82f6",
-      background: "#fff",
+      background: THEME.inputBg,
       outline: "none",
       fontSize: 14,
       fontFamily: "inherit",
       cursor: "pointer",
       transition: "all 0.2s",
+      color: THEME.text,
     },
     textarea: {
       width: "100%",
       padding: 12,
       borderRadius: 10,
-      border: "1px solid #cbd5e1",
+      border: `1px solid ${THEME.border}`,
       resize: "vertical",
       minHeight: 120,
+      background: THEME.inputBg,
+      color: THEME.text,
+      whiteSpace: "pre-wrap",
     },
-    small: { fontSize: 12, color: "#64748b" },
+    small: { fontSize: 12, color: THEME.muted },
     btnRow: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" },
     btnSolid: {
       background: "#2563eb",
@@ -203,7 +282,7 @@ export default function Builder() {
       cursor: "pointer",
     },
     btnGhost: {
-      background: "#fff",
+      background: THEME.cardBg,
       color: "#2563eb",
       border: "1px solid #93c5fd",
       borderRadius: 10,
@@ -272,6 +351,10 @@ export default function Builder() {
       border: "1px solid #bfdbfe",
       color: "#1d4ed8",
       fontWeight: 600,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      cursor: "pointer",
     },
   };
 
@@ -727,8 +810,10 @@ export default function Builder() {
     setExporting(true);
     try {
       await upsertResume();
+      // small delay to allow server to persist before rendering
+      await new Promise((r) => setTimeout(r, 300));
       const res = await api.get(
-        `/api/v1/resumes/${resumeId}/export/${format}`,
+        `/api/v1/resumes/${resumeId}/export/${format}?t=${Date.now()}`,
         { responseType: format === "txt" ? "text" : "blob" }
       );
       const blob = new Blob([res.data], {
@@ -1239,6 +1324,8 @@ export default function Builder() {
                       style={S.dateInput}
                       value={exp.startDate}
                       placeholder="Select start date"
+                      onFocus={openNativeDatePicker}
+                      onClick={openNativeDatePicker}
                       onChange={(e) => {
                         const newExp = [...resume.experience];
                         newExp[idx].startDate = e.target.value;
@@ -1264,6 +1351,8 @@ export default function Builder() {
                       value={exp.endDate}
                       disabled={exp.current}
                       placeholder="Select end date"
+                      onFocus={openNativeDatePicker}
+                      onClick={openNativeDatePicker}
                       onChange={(e) => {
                         const newExp = [...resume.experience];
                         newExp[idx].endDate = e.target.value;
@@ -1446,6 +1535,8 @@ export default function Builder() {
                       style={S.dateInput}
                       value={edu.startDate}
                       placeholder="Select start date"
+                      onFocus={openNativeDatePicker}
+                      onClick={openNativeDatePicker}
                       onChange={(e) => {
                         const newEdu = [...resume.education];
                         newEdu[idx].startDate = e.target.value;
@@ -1466,6 +1557,8 @@ export default function Builder() {
                       style={S.dateInput}
                       value={edu.endDate}
                       placeholder="Select end date"
+                      onFocus={openNativeDatePicker}
+                      onClick={openNativeDatePicker}
                       onChange={(e) => {
                         const newEdu = [...resume.education];
                         newEdu[idx].endDate = e.target.value;
@@ -1484,9 +1577,7 @@ export default function Builder() {
                     onChange={(e) => {
                       const newEdu = [...resume.education];
                       newEdu[idx].details = e.target.value
-                        .split("\n")
-                        .map((l) => l.trim())
-                        .filter(Boolean);
+                        .split("\n");
                       setResume((r) => ({ ...r, education: newEdu }));
                       markTyping();
                     }}
@@ -1528,27 +1619,35 @@ export default function Builder() {
                   .map((s) => s.name || s)
                   .filter(Boolean)
                   .map((name, i) => (
-                    <span key={`${name}-${i}`} style={S.chip}>
+                    <span
+                      key={`${name}-${i}`}
+                      style={S.chip}
+                      onClick={() => removeSkill(name)}
+                      title="Remove"
+                    >
                       {name}
+                      <span style={{fontWeight:700, lineHeight:1}}>×</span>
                     </span>
                   ))}
               </div>
               <div style={{ marginTop: 10 }}>
-                <label style={S.label}>Add skills (comma separated)</label>
+                <label style={S.label}>Add a skill (press Enter to add)</label>
                 <input
                   style={S.input}
-                  value={skillsAsString}
-                  placeholder="Figma, User Research, Prototyping, Adobe XD"
-                  onChange={(e) =>
-                    setResume((r) => ({
-                      ...r,
-                      skills: e.target.value
-                        .split(",")
-                        .map((x) => ({ name: x.trim() }))
-                        .filter((x) => x.name),
-                    }))
-                  }
-                  onInput={markTyping}
+                  value={skillsInput}
+                  placeholder="Type a skill and press Enter"
+                  onChange={(e) => setSkillsInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitSkillToken();
+                      setSkillsInput("");
+                    }
+                  }}
+                  onBlur={() => {
+                    commitSkillToken();
+                    setSkillsInput("");
+                  }}
                 />
               </div>
             </div>
@@ -1848,339 +1947,132 @@ function CompletionModal({ data, onClose, onExport, exporting }) {
     rightPanel: {
       flex: 1,
       padding: "32px",
-      background: "#f8fafc",
-      display: "flex",
-      flexDirection: "column",
+      background: THEME.panelBg,
     },
-    previewContainer: {
-      flex: 1,
-      border: "1px solid #e5e7eb",
-      borderRadius: "12px",
-      overflow: "hidden",
-      background: "#fff",
-      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-    },
-    previewFrame: {
-      width: "100%",
-      height: "100%",
-      border: "none",
-      background: "white",
-    },
-    section: { marginBottom: "24px" },
-    sectionTitle: {
-      fontSize: "16px",
-      fontWeight: "600",
-      color: "#0f172a",
-      marginBottom: "12px",
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-    },
-    sectionContent: { fontSize: "14px", color: "#374151", lineHeight: 1.6 },
-    downloadSection: {
-      marginTop: "24px",
-      padding: "20px",
-      background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
-      borderRadius: "12px",
-      border: "1px solid #93c5fd",
-    },
-    downloadTitle: {
-      fontSize: "18px",
-      fontWeight: "600",
-      color: "#1e40af",
-      marginBottom: "12px",
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-    },
-    downloadButtons: { display: "flex", gap: "12px", flexWrap: "wrap" },
-    downloadBtn: {
-      padding: "12px 20px",
-      borderRadius: "10px",
-      border: "none",
-      fontWeight: "600",
-      cursor: "pointer",
-      fontSize: "14px",
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-      transition: "all 0.2s",
-      minWidth: "120px",
-      justifyContent: "center",
-    },
-    pdfBtn: { background: "#dc2626", color: "white" },
-    docxBtn: { background: "#2563eb", color: "white" },
-    txtBtn: { background: "#059669", color: "white" },
-    successMessage: {
-      background: "#f0fdf4",
-      border: "1px solid #bbf7d0",
-      borderRadius: "8px",
-      padding: "16px",
-      marginBottom: "20px",
-    },
-    successTitle: {
-      fontSize: "16px",
-      fontWeight: "600",
-      color: "#166534",
-      marginBottom: "4px",
-    },
-    successText: { fontSize: "14px", color: "#15803d" },
   };
-
-  const handleDownload = async (format) => {
-    await onExport(format);
-  };
-
   return (
-    <div style={modalStyles.overlay} onClick={onClose}>
-      <div style={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
+    <div style={modalStyles.overlay}>
+      <div style={modalStyles.modal}>
         <div style={modalStyles.header}>
           <div>
-            <h2 style={modalStyles.title}>🎉 Resume Complete!</h2>
+            <h2 style={modalStyles.title}>{resume.title || "Your Resume"}</h2>
             <p style={modalStyles.subtitle}>
-              Your professional resume is ready for download
+              {template?.name || template?.slug}
             </p>
           </div>
-          <button
-            style={modalStyles.closeBtn}
-            onClick={onClose}
-            onMouseEnter={(e) => {
-              e.target.style.background = "#f1f5f9";
-              e.target.style.color = "#0f172a";
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = "none";
-              e.target.style.color = "#64748b";
-            }}>
+          <button style={modalStyles.closeBtn} onClick={onClose}>
             ×
           </button>
         </div>
-
-        {/* Body */}
         <div style={modalStyles.body}>
-          {/* Left Panel - Resume Details */}
           <div style={modalStyles.leftPanel}>
-            <div style={modalStyles.successMessage}>
-              <div style={modalStyles.successTitle}>
-                ✅ Resume Successfully Created!
+            <h3 style={S.sectionTitle}>Contact Information</h3>
+            <div style={S.grid2}>
+              <div>
+                <p style={S.label}>Full Name:</p>
+                <p>{resume.contact.fullName}</p>
               </div>
-              <div style={modalStyles.successText}>
-                Your resume has been saved and is ready for download. You can
-                also continue editing or create another resume.
+              <div>
+                <p style={S.label}>Email:</p>
+                <p>{resume.contact.email}</p>
               </div>
-            </div>
-
-            <div style={modalStyles.section}>
-              <div style={modalStyles.sectionTitle}>
-                <span>👤</span>Contact Information
+              <div>
+                <p style={S.label}>Phone:</p>
+                <p>{resume.contact.phone}</p>
               </div>
-              <div style={modalStyles.sectionContent}>
-                <div>
-                  <strong>Name:</strong>{" "}
-                  {resume?.contact?.fullName || "Not provided"}
-                </div>
-                <div>
-                  <strong>Email:</strong>{" "}
-                  {resume?.contact?.email || "Not provided"}
-                </div>
-                <div>
-                  <strong>Phone:</strong>{" "}
-                  {resume?.contact?.phone || "Not provided"}
-                </div>
-                <div>
-                  <strong>Location:</strong>{" "}
-                  {resume?.contact?.address || "Not provided"}
-                </div>
-                {resume?.contact?.website && (
-                  <div>
-                    <strong>Website:</strong> {resume.contact.website}
-                  </div>
-                )}
+              <div>
+                <p style={S.label}>Location:</p>
+                <p>{resume.contact.address}</p>
+              </div>
+              <div>
+                <p style={S.label}>Website:</p>
+                <p>{resume.contact.website}</p>
+              </div>
+              <div>
+                <p style={S.label}>Headline:</p>
+                <p>{resume.contact.headline}</p>
               </div>
             </div>
 
-            <div style={modalStyles.section}>
-              <div style={modalStyles.sectionTitle}>
-                <span>💼</span>Experience
+            <h3 style={S.sectionTitle}>Experience</h3>
+            {resume.experience.map((exp, idx) => (
+              <div key={idx} style={{ marginBottom: 12 }}>
+                <p style={S.label}>
+                  {exp.title || "Job Title"} at {exp.company || "Company"}
+                </p>
+                <p style={S.small}>
+                  {formatDate(exp.startDate)} -{" "}
+                  {exp.current ? "Present" : formatDate(exp.endDate)}
+                </p>
+                <ul style={{ margin: "4px 0 0 20px", fontSize: 13 }}>
+                  {exp.bullets.map((bullet, bulletIdx) => (
+                    <li key={bulletIdx}>{bullet}</li>
+                  ))}
+                </ul>
               </div>
-              <div style={modalStyles.sectionContent}>
-                {resume?.experience?.length > 0 ? (
-                  resume.experience.map((exp, idx) => (
-                    <div key={idx} style={{ marginBottom: "12px" }}>
-                      <div>
-                        <strong>{exp.title || "Position"}</strong> at{" "}
-                        {exp.company || "Company"}
-                      </div>
-                      {exp.location && <div>📍 {exp.location}</div>}
-                      {exp.startDate && (
-                        <div>
-                          📅 {new Date(exp.startDate).toLocaleDateString()} -{" "}
-                          {exp.current
-                            ? "Present"
-                            : exp.endDate
-                            ? new Date(exp.endDate).toLocaleDateString()
-                            : "N/A"}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <div>No experience added</div>
-                )}
-              </div>
-            </div>
+            ))}
 
-            <div style={modalStyles.section}>
-              <div style={modalStyles.sectionTitle}>
-                <span>🎓</span>Education
+            <h3 style={S.sectionTitle}>Education</h3>
+            {resume.education.map((edu, idx) => (
+              <div key={idx} style={{ marginBottom: 12 }}>
+                <p style={S.label}>
+                  {edu.degree || "Degree"} in {edu.school || "School"}
+                </p>
+                <p style={S.small}>
+                  {formatDate(edu.startDate)} -{" "}
+                  {edu.endDate ? formatDate(edu.endDate) : "Graduation"}
+                </p>
+                <p style={S.small}>
+                  {edu.location ? `• ${edu.location}` : ""}
+                </p>
+                <ul style={{ margin: "4px 0 0 20px", fontSize: 13 }}>
+                  {edu.details.map((detail, detailIdx) => (
+                    <li key={detailIdx}>{detail}</li>
+                  ))}
+                </ul>
               </div>
-              <div style={modalStyles.sectionContent}>
-                {resume?.education?.length > 0 ? (
-                  resume.education.map((edu, idx) => (
-                    <div key={idx} style={{ marginBottom: "12px" }}>
-                      <div>
-                        <strong>{edu.degree || "Degree"}</strong>
-                      </div>
-                      <div>🏫 {edu.school || "School"}</div>
-                      {edu.location && <div>📍 {edu.location}</div>}
-                    </div>
-                  ))
-                ) : (
-                  <div>No education added</div>
-                )}
-              </div>
-            </div>
+            ))}
 
-            <div style={modalStyles.section}>
-              <div style={modalStyles.sectionTitle}>
-                <span>🛠️</span>Skills
-              </div>
-              <div style={modalStyles.sectionContent}>
-                {resume?.skills?.length > 0 ? (
-                  <div
-                    style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                    {resume.skills.map((skill, idx) => (
-                      <span
-                        key={idx}
-                        style={{
-                          background: "#eff6ff",
-                          color: "#1e40af",
-                          padding: "4px 12px",
-                          borderRadius: "20px",
-                          fontSize: "12px",
-                          fontWeight: "500",
-                        }}>
-                        {skill.name || skill}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <div>No skills added</div>
-                )}
-              </div>
-            </div>
-
-            <div style={modalStyles.section}>
-              <div style={modalStyles.sectionTitle}>
-                <span>🎨</span>Template Information
-              </div>
-              <div style={modalStyles.sectionContent}>
-                <div>
-                  <strong>Template:</strong> {template?.name || "Unknown"}
-                </div>
-                <div>
-                  <strong>Category:</strong>{" "}
-                  {template?.category === "premium" ? "⭐ Premium" : "🆓 Free"}
-                </div>
-                <div>
-                  <strong>Resume ID:</strong> {resumeId}
-                </div>
-              </div>
+            <h3 style={S.sectionTitle}>Skills</h3>
+            <div style={S.chipRow}>
+              {resume.skills.map((skill, idx) => (
+                <span key={idx} style={S.chip}>
+                  {skill.name || skill}
+                </span>
+              ))}
             </div>
           </div>
-
-          {/* Right Panel - Preview & Download */}
           <div style={modalStyles.rightPanel}>
-            <div style={{ marginBottom: "20px" }}>
-              <h3
-                style={{
-                  fontSize: "18px",
-                  fontWeight: "600",
-                  color: "#0f172a",
-                  margin: "0 0 8px",
-                }}>
-                📄 Final Preview
-              </h3>
-              <p style={{ fontSize: "14px", color: "#64748b", margin: 0 }}>
-                This is how your resume will look when downloaded
-              </p>
-            </div>
-
-            <div style={modalStyles.previewContainer}>
-              <iframe
-                title="final-resume-preview"
-                srcDoc={previewHtml}
-                style={modalStyles.previewFrame}
-                sandbox="allow-same-origin"
-              />
-            </div>
-
-            <div style={modalStyles.downloadSection}>
-              <div style={modalStyles.downloadTitle}>
-                <span>📥</span>Download Your Resume
-              </div>
-              <p
-                style={{
-                  fontSize: "14px",
-                  color: "#1e40af",
-                  margin: "0 0 16px",
-                }}>
-                Choose your preferred format for downloading
-              </p>
-              <div style={modalStyles.downloadButtons}>
-                <button
-                  style={{ ...modalStyles.downloadBtn, ...modalStyles.pdfBtn }}
-                  onClick={() => handleDownload("pdf")}
-                  disabled={exporting}
-                  onMouseEnter={(e) => {
-                    if (!exporting)
-                      e.target.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = "translateY(0)";
-                  }}>
-                  {exporting ? "⏳" : "📕"} PDF
-                </button>
-                <button
-                  style={{ ...modalStyles.downloadBtn, ...modalStyles.docxBtn }}
-                  onClick={() => handleDownload("docx")}
-                  disabled={exporting}
-                  onMouseEnter={(e) => {
-                    if (!exporting)
-                      e.target.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = "translateY(0)";
-                  }}>
-                  {exporting ? "⏳" : "📘"} DOCX
-                </button>
-                <button
-                  style={{ ...modalStyles.downloadBtn, ...modalStyles.txtBtn }}
-                  onClick={() => handleDownload("txt")}
-                  disabled={exporting}
-                  onMouseEnter={(e) => {
-                    if (!exporting)
-                      e.target.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = "translateY(0)";
-                  }}>
-                  {exporting ? "⏳" : "📄"} TXT
-                </button>
-              </div>
-            </div>
+            <h3 style={S.sectionTitle}>Summary</h3>
+            <div
+              dangerouslySetInnerHTML={{ __html: resume.contact.summary }}
+            />
           </div>
+        </div>
+        <div style={{ padding: "24px 32px", borderTop: "1px solid #e5e7eb" }}>
+          <button
+            style={{ ...S.btnSolid, width: "100%" }}
+            onClick={() => onExport("pdf")}
+            disabled={exporting}>
+            {exporting ? "Exporting..." : "Download PDF"}
+          </button>
+          <button
+            style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
+            onClick={() => onExport("docx")}
+            disabled={exporting}>
+            {exporting ? "Exporting..." : "Download DOCX"}
+          </button>
+          <button
+            style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
+            onClick={() => onExport("txt")}
+            disabled={exporting}>
+            {exporting ? "Exporting..." : "Download TXT"}
+          </button>
+          <button
+            style={{ ...S.btnGhost, width: "100%", marginTop: 10 }}
+            onClick={onClose}>
+            Close
+          </button>
         </div>
       </div>
     </div>

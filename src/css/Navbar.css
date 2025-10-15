@@ -5,7 +5,7 @@
 .nav-links { display: flex; gap: 18px; justify-self: center; }
 .nav-links a { color: #1f2937; text-decoration: none; font-weight: 500; }
 .nav-cta { display: flex; gap: 10px; justify-self: end; }
-.btn-outline { border: 1px solid #cbd5e1; color: #0f172a; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+.btn-outline { border: 0.5px solid #cbd5e1; color: #0f172a; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-weight: 600; }
 .btn-solid { background: #007BFF; color: #fff; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-weight: 700; }
 
 /* Mobile Menu Button */

@@ -911,32 +911,16 @@ export default function Builder() {
         res = await api.get(
           `/api/v1/resumes/${resumeId}/export/${format}?t=${Date.now()}`,
           {
-            responseType: format === "txt" ? "text" : "json", // Use JSON for PDF/DOCX to handle object format
-            timeout: 30000, // 30 second timeout
+            responseType: format === "txt" ? "text" : "blob",
+            timeout: 30000,
           }
         );
       } catch (error) {
-        // If arraybuffer fails, try as text to see error message
-        if (format !== "txt" && error.response?.status >= 400) {
-          console.log(
-            "Binary request failed, trying as text to get error message..."
-          );
-          try {
-            const errorRes = await api.get(
-              `/api/v1/resumes/${resumeId}/export/${format}?t=${Date.now()}`,
-              {
-                responseType: "json",
-                timeout: 30000,
-              }
-            );
-            console.log("Error response as text:", errorRes.data);
-            throw new Error(`Server error: ${errorRes.data}`);
-          } catch (textError) {
-            throw error; // Re-throw original error
-          }
-        }
         throw error;
       }
+
+      // Debug: ensure we actually received a Blob for PDF/DOCX
+      console.log("isBlob:", res.data instanceof Blob, "blobType:", res.data?.type);
 
       console.log("Export response:", res);
       console.log("Response status:", res.status);
@@ -948,124 +932,25 @@ export default function Builder() {
       );
       console.log("Response data:", res.data);
 
-      // Check if response data is a JSON object with numeric keys (common PDF issue)
-      if (
-        typeof res.data === "object" &&
-        !Array.isArray(res.data) &&
-        !(res.data instanceof ArrayBuffer)
-      ) {
-        console.log(
-          "Response data is a JSON object, converting to ArrayBuffer..."
-        );
-        const keys = Object.keys(res.data)
-          .map(Number)
-          .sort((a, b) => a - b);
-        console.log("Object keys:", keys.slice(0, 10), "..."); // Show first 10 keys
+      // Build the file blob
+      const mimeType =
+        format === "pdf"
+          ? "application/pdf"
+          : format === "docx"
+          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          : "text/plain";
+      const blob =
+        format === "txt" ? new Blob([res.data], { type: mimeType }) : res.data;
+      const fileBlob = format === "txt" ? blob : new Blob([blob], { type: mimeType });
 
-        if (keys.length > 0) {
-          const uint8Array = new Uint8Array(keys.length);
-          keys.forEach((key, index) => {
-            uint8Array[index] = res.data[key];
-          });
-          res.data = uint8Array.buffer;
-          console.log("Converted to ArrayBuffer, size:", res.data.byteLength);
-        } else {
-          throw new Error("Invalid PDF data format - no numeric keys found");
-        }
-      }
-
-      // Check if response is actually an error message
-      if (typeof res.data === "string" && res.data.includes("error")) {
-        console.error("Server returned error message:", res.data);
-        throw new Error("Server error: " + res.data);
-      }
-
-      if (!res.data) {
-        throw new Error("No data received from server");
-      }
-
-      // Check if response is empty
-      if (res.data.length === 0 || res.data.size === 0) {
-        throw new Error("Empty response received from server");
-      }
-
-      // Check if the response is too small to be a valid file
-      const dataSize = res.data?.length || res.data?.size || 0;
-      if (dataSize < 100) {
-        console.warn("Response data is very small, might be an error message");
-        if (typeof res.data === "string") {
-          console.log("Response content:", res.data);
-        }
-      }
-
-      // Validate PDF data
-      if (format === "pdf") {
-        if (res.data instanceof ArrayBuffer) {
-          const uint8Array = new Uint8Array(res.data);
-          console.log("PDF data as ArrayBuffer, size:", uint8Array.length);
-          // Check if it starts with PDF header
-          if (uint8Array.length > 4) {
-            const header = String.fromCharCode(
-              uint8Array[0],
-              uint8Array[1],
-              uint8Array[2],
-              uint8Array[3]
-            );
-            console.log("PDF header:", header);
-            if (header !== "%PDF") {
-              console.warn("Warning: Data doesn't start with PDF header");
-            }
-          }
-        } else if (typeof res.data === "string") {
-          console.log("PDF data as string, length:", res.data.length);
-          if (!res.data.startsWith("%PDF")) {
-            console.warn("Warning: String data doesn't start with PDF header");
-          }
-        }
-      }
-
-      // Handle different response types
-      let blob;
-      if (format === "txt") {
-        blob = new Blob([res.data], { type: "text/plain" });
-      } else if (format === "pdf") {
-        blob = new Blob([res.data], { type: "application/pdf" });
-        console.log("Created PDF blob, size:", blob.size);
-      } else if (format === "docx") {
-        blob = new Blob([res.data], {
-          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        });
-      } else {
-        blob = new Blob([res.data], { type: "application/octet-stream" });
-      }
-
-      const url = window.URL.createObjectURL(blob);
-
-      // For PDF, also try to open in new tab for preview
-      if (format === "pdf") {
-        try {
-          const newWindow = window.open(url, "_blank");
-          if (!newWindow) {
-            console.warn("Popup blocked, falling back to download only");
-          }
-        } catch (error) {
-          console.warn("Failed to open PDF in new tab:", error);
-        }
-      }
-
+      const url = window.URL.createObjectURL(fileBlob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `${resume.title || "resume"}.${format}`;
-      a.style.display = "none";
       document.body.appendChild(a);
       a.click();
-
-      // Clean up
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }, 100);
-
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       alert(`Resume exported successfully as ${format.toUpperCase()}!`);
     } catch (err) {
       console.error("Export error:", err);

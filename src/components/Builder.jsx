@@ -141,10 +141,7 @@ export default function Builder() {
       if (existing.includes(token)) return r; // avoid duplicates
       return {
         ...r,
-        skills: [
-          ...existing.map((n) => ({ name: n })),
-          { name: token },
-        ],
+        skills: [...existing.map((n) => ({ name: n })), { name: token }],
       };
     });
     setSkillsInput("");
@@ -227,7 +224,12 @@ export default function Builder() {
       gridTemplateRows: "48px 1fr",
       color: THEME.text,
     },
-    headerTitle: { fontSize: 22, fontWeight: 700, margin: 0, color: THEME.text },
+    headerTitle: {
+      fontSize: 22,
+      fontWeight: 700,
+      margin: 0,
+      color: THEME.text,
+    },
     headerSub: { marginTop: 6, color: THEME.sub, fontSize: 14 },
     grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
     label: {
@@ -365,7 +367,7 @@ export default function Builder() {
       try {
         const wantedId = location.state?.resumeId || null;
         const [tplRes, resumeRes] = await Promise.all([
-          api.get("/api/v1/templates"),
+          api.get("/api/v1/templates/public"),
           wantedId
             ? api.get(`/api/v1/resumes/${wantedId}`)
             : Promise.resolve({ data: null }),
@@ -801,6 +803,95 @@ export default function Builder() {
     }
   };
 
+  // ---------- Test PDF Export (for debugging) ----------
+  const testPdfExport = async () => {
+    if (!resumeId) {
+      alert("Please save your resume first");
+      return;
+    }
+
+    console.log("=== PDF Export Debug Test ===");
+    console.log("Resume ID:", resumeId);
+    console.log("Resume data:", resume);
+    console.log("User authenticated:", !!localStorage.getItem("accessToken"));
+    console.log("Resume has template:", !!resume.templateSlug);
+    console.log("Resume has content:", !!resume.contact?.fullName);
+
+    try {
+      // First, check if the resume exists on the server
+      console.log("Checking if resume exists on server...");
+      const resumeCheck = await api.get(`/api/v1/resumes/${resumeId}`);
+      console.log("Resume check response:", resumeCheck.data);
+
+      // Test the endpoint directly
+      const testUrl = `/api/v1/resumes/${resumeId}/export/pdf?t=${Date.now()}`;
+      console.log("Testing URL:", testUrl);
+
+      const res = await api.get(testUrl, {
+        responseType: "json", // Get as JSON to handle the object format
+        timeout: 30000,
+      });
+
+      console.log("Raw response:", res);
+      console.log("Response status:", res.status);
+      console.log("Response data:", res.data);
+      console.log("Response headers:", res.headers);
+      console.log("Response data type:", typeof res.data);
+
+      // Check if response data is a JSON object with numeric keys
+      if (typeof res.data === "object" && !Array.isArray(res.data)) {
+        const keys = Object.keys(res.data)
+          .map(Number)
+          .sort((a, b) => a - b);
+        console.log("Object keys count:", keys.length);
+        console.log("First few keys:", keys.slice(0, 10));
+
+        if (keys.length > 0) {
+          // Convert to ArrayBuffer to validate PDF header
+          const uint8Array = new Uint8Array(keys.length);
+          keys.forEach((key, index) => {
+            uint8Array[index] = res.data[key];
+          });
+
+          // Check PDF header
+          if (uint8Array.length > 4) {
+            const header = String.fromCharCode(
+              uint8Array[0],
+              uint8Array[1],
+              uint8Array[2],
+              uint8Array[3]
+            );
+            console.log("PDF header:", header);
+            if (header === "%PDF") {
+              alert(
+                `PDF generated successfully! Size: ${uint8Array.length} bytes`
+              );
+            } else {
+              alert(`PDF data doesn't have valid header: ${header}`);
+            }
+          } else {
+            alert("PDF data is too small to be valid");
+          }
+        } else {
+          alert("PDF endpoint returned empty object");
+        }
+      } else if (
+        res.data &&
+        typeof res.data === "string" &&
+        res.data.includes("error")
+      ) {
+        alert("PDF generation failed: " + res.data);
+      } else {
+        alert(
+          "PDF endpoint returned unexpected format. Check console for details."
+        );
+      }
+    } catch (error) {
+      console.error("PDF test error:", error);
+      alert("PDF test failed: " + error.message);
+    }
+  };
+
   // ---------- Export ----------
   const handleExport = async (format) => {
     if (!resumeId) {
@@ -812,25 +903,185 @@ export default function Builder() {
       await upsertResume();
       // small delay to allow server to persist before rendering
       await new Promise((r) => setTimeout(r, 300));
-      const res = await api.get(
-        `/api/v1/resumes/${resumeId}/export/${format}?t=${Date.now()}`,
-        { responseType: format === "txt" ? "text" : "blob" }
+
+      console.log(`Exporting resume ${resumeId} as ${format}...`);
+
+      let res;
+      try {
+        res = await api.get(
+          `/api/v1/resumes/${resumeId}/export/${format}?t=${Date.now()}`,
+          {
+            responseType: format === "txt" ? "text" : "json", // Use JSON for PDF/DOCX to handle object format
+            timeout: 30000, // 30 second timeout
+          }
+        );
+      } catch (error) {
+        // If arraybuffer fails, try as text to see error message
+        if (format !== "txt" && error.response?.status >= 400) {
+          console.log(
+            "Binary request failed, trying as text to get error message..."
+          );
+          try {
+            const errorRes = await api.get(
+              `/api/v1/resumes/${resumeId}/export/${format}?t=${Date.now()}`,
+              {
+                responseType: "json",
+                timeout: 30000,
+              }
+            );
+            console.log("Error response as text:", errorRes.data);
+            throw new Error(`Server error: ${errorRes.data}`);
+          } catch (textError) {
+            throw error; // Re-throw original error
+          }
+        }
+        throw error;
+      }
+
+      console.log("Export response:", res);
+      console.log("Response status:", res.status);
+      console.log("Response headers:", res.headers);
+      console.log("Response data type:", typeof res.data);
+      console.log(
+        "Response data size:",
+        res.data?.length || res.data?.size || "unknown"
       );
-      const blob = new Blob([res.data], {
-        type: format === "txt" ? "text/plain" : "application/octet-stream",
-      });
+      console.log("Response data:", res.data);
+
+      // Check if response data is a JSON object with numeric keys (common PDF issue)
+      if (
+        typeof res.data === "object" &&
+        !Array.isArray(res.data) &&
+        !(res.data instanceof ArrayBuffer)
+      ) {
+        console.log(
+          "Response data is a JSON object, converting to ArrayBuffer..."
+        );
+        const keys = Object.keys(res.data)
+          .map(Number)
+          .sort((a, b) => a - b);
+        console.log("Object keys:", keys.slice(0, 10), "..."); // Show first 10 keys
+
+        if (keys.length > 0) {
+          const uint8Array = new Uint8Array(keys.length);
+          keys.forEach((key, index) => {
+            uint8Array[index] = res.data[key];
+          });
+          res.data = uint8Array.buffer;
+          console.log("Converted to ArrayBuffer, size:", res.data.byteLength);
+        } else {
+          throw new Error("Invalid PDF data format - no numeric keys found");
+        }
+      }
+
+      // Check if response is actually an error message
+      if (typeof res.data === "string" && res.data.includes("error")) {
+        console.error("Server returned error message:", res.data);
+        throw new Error("Server error: " + res.data);
+      }
+
+      if (!res.data) {
+        throw new Error("No data received from server");
+      }
+
+      // Check if response is empty
+      if (res.data.length === 0 || res.data.size === 0) {
+        throw new Error("Empty response received from server");
+      }
+
+      // Check if the response is too small to be a valid file
+      const dataSize = res.data?.length || res.data?.size || 0;
+      if (dataSize < 100) {
+        console.warn("Response data is very small, might be an error message");
+        if (typeof res.data === "string") {
+          console.log("Response content:", res.data);
+        }
+      }
+
+      // Validate PDF data
+      if (format === "pdf") {
+        if (res.data instanceof ArrayBuffer) {
+          const uint8Array = new Uint8Array(res.data);
+          console.log("PDF data as ArrayBuffer, size:", uint8Array.length);
+          // Check if it starts with PDF header
+          if (uint8Array.length > 4) {
+            const header = String.fromCharCode(
+              uint8Array[0],
+              uint8Array[1],
+              uint8Array[2],
+              uint8Array[3]
+            );
+            console.log("PDF header:", header);
+            if (header !== "%PDF") {
+              console.warn("Warning: Data doesn't start with PDF header");
+            }
+          }
+        } else if (typeof res.data === "string") {
+          console.log("PDF data as string, length:", res.data.length);
+          if (!res.data.startsWith("%PDF")) {
+            console.warn("Warning: String data doesn't start with PDF header");
+          }
+        }
+      }
+
+      // Handle different response types
+      let blob;
+      if (format === "txt") {
+        blob = new Blob([res.data], { type: "text/plain" });
+      } else if (format === "pdf") {
+        blob = new Blob([res.data], { type: "application/pdf" });
+        console.log("Created PDF blob, size:", blob.size);
+      } else if (format === "docx") {
+        blob = new Blob([res.data], {
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        });
+      } else {
+        blob = new Blob([res.data], { type: "application/octet-stream" });
+      }
+
       const url = window.URL.createObjectURL(blob);
+
+      // For PDF, also try to open in new tab for preview
+      if (format === "pdf") {
+        try {
+          const newWindow = window.open(url, "_blank");
+          if (!newWindow) {
+            console.warn("Popup blocked, falling back to download only");
+          }
+        } catch (error) {
+          console.warn("Failed to open PDF in new tab:", error);
+        }
+      }
+
       const a = document.createElement("a");
       a.href = url;
       a.download = `${resume.title || "resume"}.${format}`;
+      a.style.display = "none";
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+
+      // Clean up
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
+
       alert(`Resume exported successfully as ${format.toUpperCase()}!`);
     } catch (err) {
       console.error("Export error:", err);
-      alert(`Failed to export as ${format.toUpperCase()}. Please try again.`);
+      let errorMessage = `Failed to export as ${format.toUpperCase()}. `;
+
+      if (err.response?.status === 404) {
+        errorMessage += "Resume not found. Please try saving again.";
+      } else if (err.response?.status === 500) {
+        errorMessage += "Server error. Please try again later.";
+      } else if (err.code === "ECONNABORTED") {
+        errorMessage += "Request timed out. Please try again.";
+      } else {
+        errorMessage += "Please try again.";
+      }
+
+      alert(errorMessage);
     } finally {
       setExporting(false);
     }
@@ -1576,8 +1827,7 @@ export default function Builder() {
                     value={(edu.details || []).join("\n")}
                     onChange={(e) => {
                       const newEdu = [...resume.education];
-                      newEdu[idx].details = e.target.value
-                        .split("\n");
+                      newEdu[idx].details = e.target.value.split("\n");
                       setResume((r) => ({ ...r, education: newEdu }));
                       markTyping();
                     }}
@@ -1623,10 +1873,9 @@ export default function Builder() {
                       key={`${name}-${i}`}
                       style={S.chip}
                       onClick={() => removeSkill(name)}
-                      title="Remove"
-                    >
+                      title="Remove">
                       {name}
-                      <span style={{fontWeight:700, lineHeight:1}}>×</span>
+                      <span style={{ fontWeight: 700, lineHeight: 1 }}>×</span>
                     </span>
                   ))}
               </div>
@@ -1822,6 +2071,19 @@ export default function Builder() {
               }}>
               {exporting ? "⏳" : "📘 DOCX"}
             </button>
+            <button
+              onClick={testPdfExport}
+              disabled={!resumeId}
+              style={{
+                ...S.btnGhost,
+                padding: "6px 10px",
+                fontSize: 12,
+                background: "#dc2626",
+                color: "white",
+                border: "none",
+              }}>
+              🧪 Test PDF
+            </button>
           </div>
         </div>
         <div style={S.card}>
@@ -1862,23 +2124,27 @@ export default function Builder() {
           .catch((err) => ({ data: { html: previewHtml } })),
       ]);
       const resumeData = resumeRes.data?.data?.resume || resumeRes.data?.data;
-      const serverHtml =
+      // Use the current local preview (what user sees in builder) as primary
+      // Server preview as fallback only if local preview is empty
+      const finalPreviewHtml =
+        previewHtml ||
         previewRes.data?.data?.html ||
         previewRes.data?.html ||
-        previewHtml ||
         "";
+
       setCompletionData({
         resume: resumeData,
-        previewHtml: serverHtml,
+        previewHtml: finalPreviewHtml,
         template: selectedTemplate,
         resumeId,
       });
       setShowCompletionModal(true);
     } catch (error) {
       console.error("Failed to load completion data:", error);
+      // Use local preview as fallback
       setCompletionData({
         resume,
-        previewHtml,
+        previewHtml: previewHtml || "",
         template: selectedTemplate,
         resumeId,
       });
@@ -1892,6 +2158,93 @@ export default function Builder() {
 // ------------------------------
 function CompletionModal({ data, onClose, onExport, exporting }) {
   const { resume, previewHtml, template, resumeId } = data;
+
+  // Define formatDate function
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  };
+
+  // Define theme for this component
+  const isDark =
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const THEME = isDark
+    ? {
+        pageBg: "linear-gradient(180deg,#0b1220,#0b1220 40%,#0b1220 100%)",
+        cardBg: "#0f172a",
+        panelBg: "#1e293b",
+        border: "#334155",
+        text: "#f1f5f9",
+        sub: "#94a3b8",
+        muted: "#64748b",
+        inputBg: "#1e293b",
+      }
+    : {
+        pageBg: "linear-gradient(180deg,#f8fafc,#f1f5f9 40%,#e2e8f0 100%)",
+        cardBg: "#ffffff",
+        panelBg: "#f8fafc",
+        border: "#e2e8f0",
+        text: "#0f172a",
+        sub: "#64748b",
+        muted: "#94a3b8",
+        inputBg: "#ffffff",
+      };
+
+  // Define styles for this component
+  const S = {
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: 600,
+      margin: "0 0 16px 0",
+      color: THEME.text,
+      borderBottom: `2px solid ${THEME.border}`,
+      paddingBottom: 8,
+    },
+    label: {
+      fontSize: 12,
+      color: THEME.sub,
+      marginBottom: 6,
+      display: "block",
+      fontWeight: 500,
+    },
+    grid2: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 12,
+      marginBottom: 16,
+    },
+    btnSolid: {
+      background: "#2563eb",
+      color: "#fff",
+      border: "1px solid #1d4ed8",
+      borderRadius: 10,
+      padding: "12px 20px",
+      fontSize: 14,
+      fontWeight: 500,
+      cursor: "pointer",
+      transition: "all 0.2s",
+    },
+    btnGhost: {
+      background: THEME.cardBg,
+      color: "#2563eb",
+      border: "1px solid #93c5fd",
+      borderRadius: 10,
+      padding: "12px 20px",
+      fontSize: 14,
+      fontWeight: 500,
+      cursor: "pointer",
+      transition: "all 0.2s",
+    },
+    small: {
+      fontSize: 12,
+      color: THEME.muted,
+      margin: "2px 0",
+    },
+  };
+
   const modalStyles = {
     overlay: {
       position: "fixed",
@@ -2022,9 +2375,7 @@ function CompletionModal({ data, onClose, onExport, exporting }) {
                   {formatDate(edu.startDate)} -{" "}
                   {edu.endDate ? formatDate(edu.endDate) : "Graduation"}
                 </p>
-                <p style={S.small}>
-                  {edu.location ? `• ${edu.location}` : ""}
-                </p>
+                <p style={S.small}>{edu.location ? `• ${edu.location}` : ""}</p>
                 <ul style={{ margin: "4px 0 0 20px", fontSize: 13 }}>
                   {edu.details.map((detail, detailIdx) => (
                     <li key={detailIdx}>{detail}</li>
@@ -2043,10 +2394,39 @@ function CompletionModal({ data, onClose, onExport, exporting }) {
             </div>
           </div>
           <div style={modalStyles.rightPanel}>
-            <h3 style={S.sectionTitle}>Summary</h3>
+            <h3 style={S.sectionTitle}>Resume Preview</h3>
             <div
-              dangerouslySetInnerHTML={{ __html: resume.contact.summary }}
-            />
+              style={{
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                overflow: "hidden",
+                height: "600px",
+              }}>
+              {previewHtml ? (
+                <iframe
+                  title="resume-preview"
+                  srcDoc={previewHtml}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                    background: "white",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: "100%",
+                    color: "#64748b",
+                    fontSize: "14px",
+                  }}>
+                  Loading preview...
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <div style={{ padding: "24px 32px", borderTop: "1px solid #e5e7eb" }}>

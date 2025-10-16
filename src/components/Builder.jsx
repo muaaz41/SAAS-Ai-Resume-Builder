@@ -4,7 +4,6 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useLocation } from "react-router-dom";
 import RichTextEditor from "./RichTextEditor.jsx";
 import Loader from "./Loader.jsx";
-// import Loader from "./Loader.jsx";
 
 // ------------------------------
 // Helper: sanitize resume payload

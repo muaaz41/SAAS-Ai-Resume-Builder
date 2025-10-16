@@ -100,7 +100,7 @@ const RichTextToolbar = ({ onFormat }) => {
         }}
       />
 
-      <button
+      {/* <button
         type="button"
         onClick={() => onFormat("removeFormat")}
         style={{ ...buttonStyle, color: "#dc2626" }}
@@ -108,7 +108,7 @@ const RichTextToolbar = ({ onFormat }) => {
         onMouseLeave={(e) => (e.target.style.background = "#fff")}
         title="Clear Formatting">
         ✕ Clear
-      </button>
+      </button> */}
     </div>
   );
 };

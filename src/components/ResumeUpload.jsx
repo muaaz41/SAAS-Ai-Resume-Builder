@@ -513,7 +513,14 @@ Cancel
 style={S.btnSolid}
 onClick={handleParse}
 disabled={parsing}>
-{parsing ? "Parsing..." : "Preview Resume Data"}
+{parsing ? (
+  <span style={{ display:"inline-flex", alignItems:"center", gap:8 }}>
+    <span style={{ width:16, height:16, borderRadius:"50%", border:"3px solid #e2e8f0", borderTopColor:"#fff", animation:"spin 1s linear infinite" }}></span>
+    Parsing...
+  </span>
+) : (
+  "Preview Resume Data"
+)}
 </button>
 </>
 ) : (
@@ -530,7 +537,14 @@ Re-parse
 style={S.btnSolid}
 onClick={handleImport}
 disabled={importing}>
-{importing ? "Importing..." : "Import & Edit Resume"}
+{importing ? (
+  <span style={{ display:"inline-flex", alignItems:"center", gap:8 }}>
+    <span style={{ width:16, height:16, borderRadius:"50%", border:"3px solid #e2e8f0", borderTopColor:"#fff", animation:"spin 1s linear infinite" }}></span>
+    Importing...
+  </span>
+) : (
+  "Import & Edit Resume"
+)}
 </button>
 </>
 )}

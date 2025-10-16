@@ -6,6 +6,7 @@ import Footer from "./Footer";
 import { useAuth } from "../context/AuthContext.jsx";
 import ResumeUpload from "./ResumeUpload.jsx";
 import TemplateCard from "./TemplateCard.jsx";
+import Loader from "./Loader.jsx";
 
 export default function Dashboard() {
 const navigate = useNavigate();
@@ -89,9 +90,12 @@ setDeleting(null);
 }
 };
 
+const [previewBusy, setPreviewBusy] = useState(false);
+
 const handlePreviewResume = async (resumeId) => {
 console.log("🔍 handlePreviewResume called with ID:", resumeId);
 try {
+ setPreviewBusy(true);
 // Get resume data and preview
 const [resumeRes, previewRes] = await Promise.all([
 api.get(`/api/v1/resumes/${resumeId}`),
@@ -131,6 +135,7 @@ alert(
 "Failed to load resume preview. The backend template rendering may have an issue. Please try again or contact support."
 );
 }
+finally { setPreviewBusy(false); }
 };
 
 const handleSelectTemplate = async (template) => {
@@ -352,24 +357,16 @@ Advanced Features
 </div>
 
 {/* Templates Grid */}
-{loading ? (
+          {loading ? (
 <div
 style={{
 display: "grid",
 gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
 gap: 20,
 }}>
-{[1, 2, 3, 4, 5, 6].map((i) => (
-<div
-key={i}
-style={{
-height: 400,
-background: "#f1f5f9",
-borderRadius: 16,
-animation: "pulse 2s infinite",
-}}
-/>
-))}
+              <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "center", padding: 40 }}>
+                <Loader size={28} label="Loading templates & resumes..." />
+              </div>
 </div>
 ) : filtered.length === 0 ? (
 <div

@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
     } catch (e) {
       // swallow network/CORS errors to avoid unhandled rejection on mount
     }
-    applyToken(null);
+    // Do not clear existing token here; caller will decide
     return null;
   }, [applyToken]);
 
@@ -57,6 +57,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     (async () => {
       try {
+        // 1) Try current token first (keeps session on reload)
+        const existing = getAccessToken();
+        if (existing) {
+          const u = await fetchMe(existing);
+          if (u) return;
+        }
+        // 2) Try refresh cookie flow
         const t = await refresh();
         await fetchMe(t);
       } finally {

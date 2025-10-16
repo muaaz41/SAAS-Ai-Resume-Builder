@@ -3,6 +3,8 @@ import { api } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useLocation } from "react-router-dom";
 import RichTextEditor from "./RichTextEditor.jsx";
+import Loader from "./Loader.jsx";
+import Loader from "./Loader.jsx";
 
 // ------------------------------
 // Helper: sanitize resume payload
@@ -28,10 +30,20 @@ const cleanResumeData = (data) => {
     return cleaned;
   };
 
+  const stripHtml = (html) => {
+    if (!html) return "";
+    const withoutTags = String(html).replace(/<[^>]*>/g, " ");
+    return withoutTags.replace(/\s+/g, " ").trim();
+  };
+
   return {
     title: data.title,
     templateSlug: data.templateSlug,
-    contact: data.contact,
+    contact: {
+      ...data.contact,
+      // Send plain-text summary to backend templates that expect text
+      summary: stripHtml(data.contact?.summary),
+    },
     experience: (data.experience || [])
       .filter((e) => e.title || e.company)
       .map(cleanDates),
@@ -60,6 +72,8 @@ export default function Builder() {
   const [aiLoading, setAiLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState(null); // 'pdf' | 'docx' | 'txt' | null
+  const [previewBusy, setPreviewBusy] = useState(false);
 
   const [serverPreview, setServerPreview] = useState("");
   const [serverPreviewUrl, setServerPreviewUrl] = useState("");
@@ -365,7 +379,8 @@ export default function Builder() {
     let alive = true;
     (async () => {
       try {
-        const wantedId = location.state?.resumeId || null;
+        const wantedId =
+          location.state?.resumeId || localStorage.getItem("lastResumeId") || null;
         const [tplRes, resumeRes] = await Promise.all([
           api.get("/api/v1/templates/public"),
           wantedId
@@ -382,7 +397,30 @@ export default function Builder() {
 
         if (wantedId && loaded) {
           setResumeId(wantedId);
-          const slugFromResume = loaded.templateSlug;
+          // Merge with locally saved copy (client is source of truth for fields some backends omit)
+          let merged = { ...loaded };
+          try {
+            const localRaw = localStorage.getItem(`resume-${wantedId}`);
+            if (localRaw) {
+              const localSaved = JSON.parse(localRaw);
+              merged = {
+                ...merged,
+                contact: { ...(merged.contact || {}), ...(localSaved.contact || {}) },
+                experience:
+                  (localSaved.experience && localSaved.experience.length > 0)
+                    ? localSaved.experience
+                    : (merged.experience || []),
+                education:
+                  (localSaved.education && localSaved.education.length > 0)
+                    ? localSaved.education
+                    : (merged.education || []),
+                skills: Array.isArray(localSaved.skills) ? localSaved.skills : (merged.skills || []),
+                title: localSaved.title || merged.title,
+              };
+            }
+          } catch { /* ignore bad local data */ }
+
+          const slugFromResume = merged.templateSlug;
           const slugFromLocation = location.state?.templateSlug;
           const finalSlug =
             slugFromResume ||
@@ -393,8 +431,8 @@ export default function Builder() {
             items.find((x) => x.slug === finalSlug) || items[0] || null;
           setSelectedTemplate(finalT || null);
 
-          const safeExperience = loaded.experience?.length
-            ? loaded.experience
+          const safeExperience = merged.experience?.length
+            ? merged.experience
             : [
                 {
                   title: "",
@@ -406,8 +444,8 @@ export default function Builder() {
                   bullets: [],
                 },
               ];
-          const safeEducation = loaded.education?.length
-            ? loaded.education
+          const safeEducation = merged.education?.length
+            ? merged.education
             : [
                 {
                   degree: "",
@@ -421,19 +459,19 @@ export default function Builder() {
 
           setResume((prev) => ({
             ...prev,
-            title: loaded.title || prev.title,
+            title: merged.title || prev.title,
             contact: {
-              fullName: loaded.contact?.fullName || prev.contact.fullName || "",
-              email: loaded.contact?.email || prev.contact.email || "",
-              phone: loaded.contact?.phone || prev.contact.phone || "",
-              address: loaded.contact?.address || prev.contact.address || "",
-              website: loaded.contact?.website || prev.contact.website || "",
-              summary: loaded.contact?.summary || prev.contact.summary || "",
-              headline: loaded.contact?.headline || prev.contact.headline || "",
+              fullName: merged.contact?.fullName || prev.contact.fullName || "",
+              email: merged.contact?.email || prev.contact.email || "",
+              phone: merged.contact?.phone || prev.contact.phone || "",
+              address: merged.contact?.address || prev.contact.address || "",
+              website: merged.contact?.website || prev.contact.website || "",
+              summary: merged.contact?.summary || prev.contact.summary || "",
+              headline: merged.contact?.headline || prev.contact.headline || "",
             },
             experience: safeExperience,
             education: safeEducation,
-            skills: loaded.skills?.length > 0 ? loaded.skills : prev.skills,
+            skills: merged.skills?.length > 0 ? merged.skills : prev.skills,
             templateSlug: finalSlug,
           }));
 
@@ -465,6 +503,7 @@ export default function Builder() {
               const newResumeId = res.data?.data?.resumeId;
               if (newResumeId) {
                 setResumeId(newResumeId);
+                localStorage.setItem("lastResumeId", newResumeId);
                 // Trigger immediate server preview fetch
                 setTimeout(() => fetchServerPreview(), 100);
               }
@@ -899,6 +938,7 @@ export default function Builder() {
       return;
     }
     setExporting(true);
+    setExportingFormat(format);
     try {
       await upsertResume();
       // small delay to allow server to persist before rendering
@@ -906,17 +946,31 @@ export default function Builder() {
 
       console.log(`Exporting resume ${resumeId} as ${format}...`);
 
+      // Build URLs (direct backend vs proxied)
+      const backendOrigin = "https://ai-resume-builder-backend-uhdm.onrender.com";
+      const ts = Date.now();
+      const directUrl = `${backendOrigin}/api/v1/resumes/${resumeId}/export/${format}?t=${ts}`;
+      const proxiedUrl = `/api/v1/resumes/${resumeId}/export/${format}?t=${ts}`;
+
+      const isLocal = /localhost|127\.0\.0\.1|::1/.test(window.location.hostname);
+
       let res;
       try {
-        res = await api.get(
-          `/api/v1/resumes/${resumeId}/export/${format}?t=${Date.now()}`,
-          {
-            responseType: format === "txt" ? "text" : "blob",
-            timeout: 30000,
-          }
-        );
-      } catch (error) {
-        throw error;
+        // In dev, try the direct backend first to bypass the Vite proxy
+        const urlToUse = isLocal ? directUrl : proxiedUrl;
+        res = await api.get(urlToUse, {
+          responseType: format === "txt" ? "text" : "blob",
+          timeout: 30000,
+          withCredentials: true,
+        });
+      } catch (firstErr) {
+        console.warn("Direct export failed, retrying via proxied URL:", firstErr?.message || firstErr);
+        // Fallback to proxied path
+        res = await api.get(proxiedUrl, {
+          responseType: format === "txt" ? "text" : "blob",
+          timeout: 30000,
+          withCredentials: true,
+        });
       }
 
       // Debug: ensure we actually received a Blob for PDF/DOCX
@@ -939,9 +993,76 @@ export default function Builder() {
           : format === "docx"
           ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           : "text/plain";
-      const blob =
-        format === "txt" ? new Blob([res.data], { type: mimeType }) : res.data;
-      const fileBlob = format === "txt" ? blob : new Blob([blob], { type: mimeType });
+
+      // If server sent HTML/JSON error, surface it before saving a bad file
+      const headerCT = res.headers?.["content-type"] || res.headers?.get?.("content-type");
+      if (format !== "txt" && headerCT && !headerCT.includes("pdf") && !headerCT.includes("word")) {
+        try {
+          const txt = await res.data.text();
+          console.error("Unexpected content-type:", headerCT, txt);
+          alert(`Export failed: ${txt.slice(0, 300)}`);
+          setExporting(false);
+          setExportingFormat(null);
+          return;
+        } catch {
+          // continue
+        }
+      }
+
+      let fileBlob;
+      if (format === "txt") {
+        fileBlob = new Blob([res.data], { type: mimeType });
+      } else {
+        // res.data is already a Blob when responseType:'blob'
+        fileBlob = res.data;
+      }
+
+      // Validate header for PDF/DOCX before saving (helps catch corrupted downloads)
+      try {
+        const head = await fileBlob.slice(0, 5).arrayBuffer();
+        const b = new Uint8Array(head);
+        const badPdf =
+          format === "pdf" && !(b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46 && b[4] === 0x2d);
+        const badDocx = format === "docx" && !(b[0] === 0x50 && b[1] === 0x4b);
+        if (badPdf || badDocx) {
+          console.warn("Unexpected file header:", Array.from(b));
+          // Fallback: some backends send JSON object of numeric keys {"0":137,"1":80,...}
+          try {
+            const txt = await fileBlob.text();
+            const maybeJson = JSON.parse(txt);
+            if (maybeJson && typeof maybeJson === "object" && !Array.isArray(maybeJson)) {
+              const keys = Object.keys(maybeJson)
+                .map((k) => parseInt(k, 10))
+                .filter((n) => Number.isFinite(n))
+                .sort((a, b) => a - b);
+              if (keys.length > 0) {
+                const uint8 = new Uint8Array(keys.length);
+                for (let i = 0; i < keys.length; i++) uint8[i] = maybeJson[keys[i]] & 0xff;
+                fileBlob = new Blob([uint8], { type: mimeType });
+                console.log("Reconstructed binary from JSON bytes (length)", keys.length);
+              } else {
+                alert("Export failed: received invalid file data.");
+                setExporting(false);
+                setExportingFormat(null);
+                return;
+              }
+            } else {
+              alert("Export failed: received text instead of a file.");
+              setExporting(false);
+              setExportingFormat(null);
+              return;
+            }
+          } catch (reconstructErr) {
+            console.error("Failed to reconstruct binary from JSON:", reconstructErr);
+            alert("Export failed: invalid file format from server.");
+            setExporting(false);
+            setExportingFormat(null);
+            return;
+          }
+        }
+      } catch {
+        // ignore header check failures
+      }
 
       const url = window.URL.createObjectURL(fileBlob);
       const a = document.createElement("a");
@@ -951,24 +1072,21 @@ export default function Builder() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+
+      // Optional: open a preview tab for quick validation (won't run on TXT)
+      if (format !== "txt") {
+        const previewUrl = window.URL.createObjectURL(fileBlob);
+        setTimeout(() => window.open(previewUrl, "_blank"), 0);
+        setTimeout(() => window.URL.revokeObjectURL(previewUrl), 10000);
+      }
+
       alert(`Resume exported successfully as ${format.toUpperCase()}!`);
     } catch (err) {
       console.error("Export error:", err);
-      let errorMessage = `Failed to export as ${format.toUpperCase()}. `;
-
-      if (err.response?.status === 404) {
-        errorMessage += "Resume not found. Please try saving again.";
-      } else if (err.response?.status === 500) {
-        errorMessage += "Server error. Please try again later.";
-      } else if (err.code === "ECONNABORTED") {
-        errorMessage += "Request timed out. Please try again.";
-      } else {
-        errorMessage += "Please try again.";
-      }
-
-      alert(errorMessage);
+      alert(`Failed to export as ${format.toUpperCase()}. Please try again.`);
     } finally {
       setExporting(false);
+      setExportingFormat(null);
     }
   };
 
@@ -1015,6 +1133,7 @@ export default function Builder() {
     previewInFlightRef.current = true;
     lastPreviewAtRef.current = Date.now();
 
+    setPreviewBusy(true);
     try {
       const r = await api.get(`/api/v1/resumes/${resumeId}/preview`, {
         signal: controller.signal,
@@ -1046,6 +1165,7 @@ export default function Builder() {
       }
     } finally {
       previewInFlightRef.current = false;
+      setPreviewBusy(false);
     }
   };
 
@@ -1608,6 +1728,32 @@ export default function Builder() {
               }>
               + Add Another Position
             </button>
+            {resume.experience.length > 1 && (
+              <button
+                type="button"
+                style={{ ...S.btnGhost, marginTop: 8, marginLeft: 8, borderColor: "#fecaca", color: "#dc2626" }}
+                onClick={() =>
+                  setResume((r) => ({
+                    ...r,
+                    experience: r.experience.slice(0, -1),
+                  }))
+                }>
+                Undo Last Add
+              </button>
+            )}
+            {resume.experience.length > 0 && (
+              <button
+                type="button"
+                style={{ ...S.btnGhost, marginTop: 8, marginLeft: 8, borderColor: "#fecaca", color: "#dc2626" }}
+                onClick={() =>
+                  setResume((r) => ({
+                    ...r,
+                    experience: r.experience.length > 1 ? [r.experience[0]] : [],
+                  }))
+                }>
+                Clear Added Positions
+              </button>
+            )}
           </>
         )}
 
@@ -1741,6 +1887,32 @@ export default function Builder() {
               }>
               + Add Another Education
             </button>
+            {resume.education.length > 1 && (
+              <button
+                type="button"
+                style={{ ...S.btnGhost, marginTop: 8, marginLeft: 8, borderColor: "#fecaca", color: "#dc2626" }}
+                onClick={() =>
+                  setResume((r) => ({
+                    ...r,
+                    education: r.education.slice(0, -1),
+                  }))
+                }>
+                Undo Last Add
+              </button>
+            )}
+            {resume.education.length > 0 && (
+              <button
+                type="button"
+                style={{ ...S.btnGhost, marginTop: 8, marginLeft: 8, borderColor: "#fecaca", color: "#dc2626" }}
+                onClick={() =>
+                  setResume((r) => ({
+                    ...r,
+                    education: r.education.length > 1 ? [r.education[0]] : [],
+                  }))
+                }>
+                Clear Added Education
+              </button>
+            )}
           </>
         )}
 
@@ -1810,6 +1982,21 @@ export default function Builder() {
                 placeholder="Write a compelling professional summary. Highlight your key achievements, skills, and career goals. Use the toolbar to format your text with bold, italic, or bullet points."
                 minHeight={150}
               />
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                <button
+                  type="button"
+                  style={{ ...S.btnGhost, borderColor: "#fecaca", color: "#dc2626" }}
+                  onClick={() => {
+                    setResume((r) => ({
+                      ...r,
+                      contact: { ...r.contact, summary: "" },
+                    }));
+                    markTyping();
+                  }}
+                >
+                  Clear Summary
+                </button>
+              </div>
             </div>
 
             {/* AI Helper Section */}
@@ -1854,7 +2041,13 @@ export default function Builder() {
                 }}
                 onClick={generateSummary}
                 disabled={aiLoading}>
-                {aiLoading ? "🔄 Generating..." : "✨ Generate Summary with AI"}
+                {aiLoading ? (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <Loader size={16} color="#fff" /> Generating...
+                  </span>
+                ) : (
+                  "✨ Generate Summary with AI"
+                )}
               </button>
             </div>
           </>
@@ -1990,6 +2183,7 @@ export default function Builder() {
           onClose={() => setShowCompletionModal(false)}
           onExport={handleExport}
           exporting={exporting}
+          exportingFormat={exportingFormat}
         />
       )}
     </div>
@@ -2002,6 +2196,8 @@ export default function Builder() {
       return;
     }
     try {
+      // Persist latest changes/template before showing modal to match export
+      await upsertResume();
       const [resumeRes, previewRes] = await Promise.all([
         api.get(`/api/v1/resumes/${resumeId}`),
         api
@@ -2009,12 +2205,11 @@ export default function Builder() {
           .catch((err) => ({ data: { html: previewHtml } })),
       ]);
       const resumeData = resumeRes.data?.data?.resume || resumeRes.data?.data;
-      // Use the current local preview (what user sees in builder) as primary
-      // Server preview as fallback only if local preview is empty
+      // Prefer server-rendered HTML so modal matches export exactly
       const finalPreviewHtml =
-        previewHtml ||
         previewRes.data?.data?.html ||
         previewRes.data?.html ||
+        previewHtml ||
         "";
 
       setCompletionData({
@@ -2041,7 +2236,7 @@ export default function Builder() {
 // ------------------------------
 // Completion Modal Component
 // ------------------------------
-function CompletionModal({ data, onClose, onExport, exporting }) {
+function CompletionModal({ data, onClose, onExport, exporting, exportingFormat }) {
   const { resume, previewHtml, template, resumeId } = data;
 
   // Define formatDate function
@@ -2186,6 +2381,9 @@ function CompletionModal({ data, onClose, onExport, exporting }) {
       flex: 1,
       padding: "32px",
       background: THEME.panelBg,
+      display: "flex",
+      flexDirection: "column",
+      minHeight: 0,
     },
   };
   return (
@@ -2285,9 +2483,14 @@ function CompletionModal({ data, onClose, onExport, exporting }) {
                 border: "1px solid #e5e7eb",
                 borderRadius: "8px",
                 overflow: "hidden",
-                height: "600px",
+                flex: 1,
+                minHeight: 0,
               }}>
-              {previewHtml ? (
+              {previewBusy ? (
+                <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center" }}>
+                  <Loader size={24} label="Rendering preview..." />
+                </div>
+              ) : previewHtml ? (
                 <iframe
                   title="resume-preview"
                   srcDoc={previewHtml}
@@ -2308,30 +2511,54 @@ function CompletionModal({ data, onClose, onExport, exporting }) {
                     color: "#64748b",
                     fontSize: "14px",
                   }}>
-                  Loading preview...
+                  <Loader size={20} label="Loading preview..." />
                 </div>
               )}
             </div>
           </div>
         </div>
-        <div style={{ padding: "24px 32px", borderTop: "1px solid #e5e7eb" }}>
+        <div style={{
+          padding: "16px 32px",
+          borderTop: "1px solid #e5e7eb",
+          position: "sticky",
+          bottom: 0,
+          background: "#fff",
+        }}>
           <button
             style={{ ...S.btnSolid, width: "100%" }}
             onClick={() => onExport("pdf")}
             disabled={exporting}>
-            {exporting ? "Exporting..." : "Download PDF"}
+            {exporting && exportingFormat === "pdf" ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <Loader size={16} color="#fff" /> Exporting...
+              </span>
+            ) : (
+              "Download PDF"
+            )}
           </button>
           <button
             style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
             onClick={() => onExport("docx")}
             disabled={exporting}>
-            {exporting ? "Exporting..." : "Download DOCX"}
+            {exporting && exportingFormat === "docx" ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <Loader size={16} color="#fff" /> Exporting...
+              </span>
+            ) : (
+              "Download DOCX"
+            )}
           </button>
           <button
             style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
             onClick={() => onExport("txt")}
             disabled={exporting}>
-            {exporting ? "Exporting..." : "Download TXT"}
+            {exporting && exportingFormat === "txt" ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <Loader size={16} color="#fff" /> Exporting...
+              </span>
+            ) : (
+              "Download TXT"
+            )}
           </button>
           <button
             style={{ ...S.btnGhost, width: "100%", marginTop: 10 }}

@@ -3,7 +3,6 @@ import { api } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useLocation } from "react-router-dom";
 import RichTextEditor from "./RichTextEditor.jsx";
-import Loader from "./Loader.jsx";
 
 // ------------------------------
 // Helper: sanitize resume payload
@@ -72,7 +71,6 @@ export default function Builder() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportingFormat, setExportingFormat] = useState(null); // 'pdf' | 'docx' | 'txt' | null
-  const [previewBusy, setPreviewBusy] = useState(false);
 
   const [serverPreview, setServerPreview] = useState("");
   const [serverPreviewUrl, setServerPreviewUrl] = useState("");
@@ -1132,7 +1130,6 @@ export default function Builder() {
     previewInFlightRef.current = true;
     lastPreviewAtRef.current = Date.now();
 
-    setPreviewBusy(true);
     try {
       const r = await api.get(`/api/v1/resumes/${resumeId}/preview`, {
         signal: controller.signal,
@@ -1164,7 +1161,6 @@ export default function Builder() {
       }
     } finally {
       previewInFlightRef.current = false;
-      setPreviewBusy(false);
     }
   };
 
@@ -2040,13 +2036,7 @@ export default function Builder() {
                 }}
                 onClick={generateSummary}
                 disabled={aiLoading}>
-                {aiLoading ? (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                    <Loader size={16} color="#fff" /> Generating...
-                  </span>
-                ) : (
-                  "✨ Generate Summary with AI"
-                )}
+                {aiLoading ? "🔄 Generating..." : "✨ Generate Summary with AI"}
               </button>
             </div>
           </>
@@ -2485,11 +2475,7 @@ function CompletionModal({ data, onClose, onExport, exporting, exportingFormat }
                 flex: 1,
                 minHeight: 0,
               }}>
-              {previewBusy ? (
-                <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center" }}>
-                  <Loader size={24} label="Rendering preview..." />
-                </div>
-              ) : previewHtml ? (
+              {previewHtml ? (
                 <iframe
                   title="resume-preview"
                   srcDoc={previewHtml}
@@ -2510,7 +2496,7 @@ function CompletionModal({ data, onClose, onExport, exporting, exportingFormat }
                     color: "#64748b",
                     fontSize: "14px",
                   }}>
-                  <Loader size={20} label="Loading preview..." />
+                  Loading preview...
                 </div>
               )}
             </div>
@@ -2526,38 +2512,20 @@ function CompletionModal({ data, onClose, onExport, exporting, exportingFormat }
           <button
             style={{ ...S.btnSolid, width: "100%" }}
             onClick={() => onExport("pdf")}
-            disabled={exporting}>
-            {exporting && exportingFormat === "pdf" ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <Loader size={16} color="#fff" /> Exporting...
-              </span>
-            ) : (
-              "Download PDF"
-            )}
+            disabled={exporting && exportingFormat === "pdf"}>
+            {exporting && exportingFormat === "pdf" ? "Exporting..." : "Download PDF"}
           </button>
           <button
             style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
             onClick={() => onExport("docx")}
-            disabled={exporting}>
-            {exporting && exportingFormat === "docx" ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <Loader size={16} color="#fff" /> Exporting...
-              </span>
-            ) : (
-              "Download DOCX"
-            )}
+            disabled={exporting && exportingFormat === "docx"}>
+            {exporting && exportingFormat === "docx" ? "Exporting..." : "Download DOCX"}
           </button>
           <button
             style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
             onClick={() => onExport("txt")}
-            disabled={exporting}>
-            {exporting && exportingFormat === "txt" ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <Loader size={16} color="#fff" /> Exporting...
-              </span>
-            ) : (
-              "Download TXT"
-            )}
+            disabled={exporting && exportingFormat === "txt"}>
+            {exporting && exportingFormat === "txt" ? "Exporting..." : "Download TXT"}
           </button>
           <button
             style={{ ...S.btnGhost, width: "100%", marginTop: 10 }}

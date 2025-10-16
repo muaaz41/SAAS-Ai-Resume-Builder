@@ -379,7 +379,7 @@ export default function Builder() {
         const wantedId =
           location.state?.resumeId || localStorage.getItem("lastResumeId") || null;
         const [tplRes, resumeRes] = await Promise.all([
-          api.get("/api/v1/templates/public"),
+          api.get("/api/v1/templates"),
           wantedId
             ? api.get(`/api/v1/resumes/${wantedId}`)
             : Promise.resolve({ data: null }),
@@ -422,10 +422,8 @@ export default function Builder() {
           const finalSlug =
             slugFromResume ||
             slugFromLocation ||
-            items[0]?.slug ||
             "modern-slate";
-          const finalT =
-            items.find((x) => x.slug === finalSlug) || items[0] || null;
+          const finalT = items.find((x) => x.slug === finalSlug) || null;
           setSelectedTemplate(finalT || null);
 
           const safeExperience = merged.experience?.length
@@ -477,10 +475,10 @@ export default function Builder() {
           const initialSlug =
             location.state?.templateSlug || items[0]?.slug || "modern-slate";
           const t =
-            items.find((x) => x.slug === initialSlug) || items[0] || null;
+            items.find((x) => x.slug === initialSlug) || null;
           setSelectedTemplate(t || null);
 
-          const finalTemplateSlug = t?.slug || items[0]?.slug || "modern-slate";
+          const finalTemplateSlug = t?.slug || "modern-slate";
           setResume((prev) => ({ ...prev, templateSlug: finalTemplateSlug }));
 
           setIsInitializing(false);
@@ -1375,6 +1373,13 @@ export default function Builder() {
   ];
 
   const userIsTyping = () => Date.now() - typingRef.current < 500; // Increased to 500ms to reduce API calls
+
+  useEffect(() => {
+    // Keep form state and picker in sync with selected template
+    if (selectedTemplate?.slug) {
+      setResume((prev) => ({ ...prev, templateSlug: selectedTemplate.slug }));
+    }
+  }, [selectedTemplate?.slug]);
 
   return (
     <div style={S.page}>

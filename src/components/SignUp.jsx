@@ -4,6 +4,7 @@ import signUpImage from "../assets/img1.jpg";
 import googleIcon from "../assets/plus.png";
 import linkedinIcon from "../assets/linkedin.png";
 import { useAuth } from "../context/AuthContext.jsx";
+import { showToast } from "../lib/toast";
 import { GoogleLogin } from "@react-oauth/google";
 import { useNavigate } from "react-router-dom";
 
@@ -25,9 +26,18 @@ const SignUp = () => {
     setLoading(true);
     try {
       await signup({ name, email, password, dob });
+      showToast("Account created! You're in.", { type: "success", duration: 2500 });
       navigate("/dashboard");
     } catch (err) {
-      setError("Signup failed");
+      const msg = err?.message || "Signup failed";
+      // Show a friendly toast for known conflicts
+      if (err?.status === 409 || /already/i.test(msg)) {
+        showToast("Email already in use. Try logging in with this account.");
+        setError("");
+      } else {
+        showToast(msg);
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

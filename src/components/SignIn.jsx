@@ -4,6 +4,7 @@ import signInImage from "../assets/img2.jpg";
 import googleIcon from "../assets/google.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate } from "react-router-dom";
+import { showToast } from "../lib/toast";
 import {
   GoogleLogin,
   googleLogout,
@@ -25,9 +26,14 @@ const SignIn = () => {
     setLoading(true);
     try {
       await login(email, password);
+      showToast("Welcome back!", { type: "success", duration: 2500 });
       navigate("/dashboard");
     } catch (err) {
-      setError("Invalid credentials");
+      const msg = err?.status === 401 || /invalid/i.test(err?.message || "")
+        ? "Invalid email or password"
+        : err?.message || "Login failed";
+      showToast(msg);
+      setError(msg);
     } finally {
       setLoading(false);
     }

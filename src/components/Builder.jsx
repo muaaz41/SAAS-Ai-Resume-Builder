@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { api } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import RichTextEditor from "./RichTextEditor.jsx";
+import { showToast } from "../lib/toast";
 
 // ------------------------------
 // Helper: sanitize resume payload
@@ -60,6 +61,7 @@ const cleanResumeData = (data) => {
 export default function Builder() {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // ---------- state ----------
   const [templates, setTemplates] = useState([]);
@@ -562,6 +564,8 @@ export default function Builder() {
         const payload = {
           title: cleanedData.title,
           templateSlug: cleanedData.templateSlug,
+          // Some backends expect `template` instead of `templateSlug` — send both
+          template: cleanedData.templateSlug,
           contact: cleanedData.contact,
         };
         if (cleanedData.experience?.length > 0) {
@@ -603,6 +607,14 @@ export default function Builder() {
             )
             .filter((s) => s.name);
         }
+        // Debug: Log what we are sending to the backend
+        try {
+          console.log("[UPsert] Payload summary length:", (payload.contact?.summary || "").length);
+          console.log("[UPsert] Experience count:", payload.experience?.length || 0);
+          console.log("[UPsert] Education count:", payload.education?.length || 0);
+          console.log("[UPsert] Skills count:", payload.skills?.length || 0);
+          console.log("[UPsert] Template:", payload.templateSlug);
+        } catch {}
         await api.patch(`/api/v1/resumes/${id}`, payload);
       }
     } catch (err) {
@@ -935,17 +947,46 @@ export default function Builder() {
     setExporting(true);
     setExportingFormat(format);
     try {
+      // For DOCX, use client-side Word export only (no backend)
+      if (format === "docx") {
+        exportClientWord();
+        showToast("Exported Word (.doc) from preview (no server)", { type: "success", duration: 1800 });
+        // Close modal and redirect similar to server flow
+        try {
+          setShowCompletionModal(false);
+        } catch {}
+        setTimeout(() => navigate("/dashboard"), 300);
+        return;
+      }
+
       await upsertResume();
       // small delay to allow server to persist before rendering
       await new Promise((r) => setTimeout(r, 300));
 
       console.log(`Exporting resume ${resumeId} as ${format}...`);
+      try {
+        // Fetch what the server currently has to confirm sections are present
+        const srv = await api.get(`/api/v1/resumes/${resumeId}`);
+        const srvResume = srv?.data?.data?.resume || srv?.data?.data || {};
+        console.log("[Export] Server resume template:", srvResume.templateSlug);
+        console.log("[Export] Server contact summary length:", (srvResume.contact?.summary || "").length);
+        console.log("[Export] Server experience count:", Array.isArray(srvResume.experience) ? srvResume.experience.length : 0);
+        console.log("[Export] Server education count:", Array.isArray(srvResume.education) ? srvResume.education.length : 0);
+        console.log("[Export] Server skills count:", Array.isArray(srvResume.skills) ? srvResume.skills.length : 0);
+        if (format === "docx") {
+          console.log("[Export] DOCX debug — first experience sample:", srvResume.experience?.[0]);
+        }
+      } catch (e) {
+        console.warn("[Export] Could not fetch server resume before export:", e?.message || e);
+      }
 
       // Build URLs (direct backend vs proxied)
       const backendOrigin = "https://ai-resume-builder-backend-uhdm.onrender.com";
       const ts = Date.now();
-      const directUrl = `${backendOrigin}/api/v1/resumes/${resumeId}/export/${format}?t=${ts}`;
-      const proxiedUrl = `/api/v1/resumes/${resumeId}/export/${format}?t=${ts}`;
+      const tpl = resume.templateSlug || selectedTemplate?.slug || "";
+      const templateQS = tpl ? `&templateSlug=${encodeURIComponent(tpl)}` : "";
+      const directUrl = `${backendOrigin}/api/v1/resumes/${resumeId}/export/${format}?t=${ts}${format === "docx" ? templateQS : ""}`;
+      const proxiedUrl = `/api/v1/resumes/${resumeId}/export/${format}?t=${ts}${format === "docx" ? templateQS : ""}`;
 
       const isLocal = /localhost|127\.0\.0\.1|::1/.test(window.location.hostname);
 
@@ -980,6 +1021,12 @@ export default function Builder() {
         res.data?.length || res.data?.size || "unknown"
       );
       console.log("Response data:", res.data);
+      if (format === "docx") {
+        try {
+          const headBuf = await res.data.slice(0, 8).arrayBuffer();
+          console.log("[Export] DOCX header bytes:", Array.from(new Uint8Array(headBuf)));
+        } catch {}
+      }
 
       // Build the file blob
       const mimeType =
@@ -1062,7 +1109,9 @@ export default function Builder() {
       const url = window.URL.createObjectURL(fileBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${resume.title || "resume"}.${format}`;
+      // Timestamp filename to avoid OS preview/cache reusing stale file
+      const safeTitle = (resume.title || "resume").replace(/[^\w\-\s]+/g, "").trim() || "resume";
+      a.download = `${safeTitle}-${Date.now()}.${format}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -1074,11 +1123,29 @@ export default function Builder() {
         setTimeout(() => window.open(previewUrl, "_blank"), 0);
         setTimeout(() => window.URL.revokeObjectURL(previewUrl), 10000);
       }
-
-      alert(`Resume exported successfully as ${format.toUpperCase()}!`);
+      // Fallback for DOCX that looks too small (often summary-only)
+      if (format === "docx" && (fileBlob?.size || 0) < 12000) {
+        console.warn("[Export] DOCX blob appears small (", fileBlob?.size, ") — falling back to client Word .doc export.");
+        exportClientWord();
+        return;
+      }
+      showToast(`Resume exported as ${format.toUpperCase()}. Redirecting…`, { type: "success", duration: 1800 });
+      // Close modal if open and redirect to dashboard after successful download
+      try {
+        setShowCompletionModal(false);
+      } catch {}
+      setTimeout(() => navigate("/dashboard"), 300);
     } catch (err) {
       console.error("Export error:", err);
-      alert(`Failed to export as ${format.toUpperCase()}. Please try again.`);
+      if (format === "docx") {
+        // Fallback to client-side Word export if server DOCX fails
+        showToast("Server DOCX failed. Exporting Word (.doc) from preview…", { type: "warning", duration: 2200 });
+        try {
+          exportClientWord();
+          return;
+        } catch (_) {}
+      }
+      showToast(`Failed to export as ${format.toUpperCase()}. Please try again.`, { type: "error" });
     } finally {
       setExporting(false);
       setExportingFormat(null);
@@ -1160,6 +1227,29 @@ export default function Builder() {
     } finally {
       previewInFlightRef.current = false;
     }
+  };
+
+  // ---------- Client-side Word export (DOC, no backend) ----------
+  const exportClientWord = () => {
+    // Prefer the most accurate HTML available
+    const html = serverPreview || previewHtml || "";
+    if (!html) {
+      showToast("No preview available to export.", { type: "error" });
+      return;
+    }
+    const full = `<!doctype html><html><head><meta charset="utf-8"><meta
+      http-equiv="X-UA-Compatible" content="IE=edge"><style>@page{margin:1in} body{font-family:Arial,Helvetica,sans-serif}</style></head><body>${html}</body></html>`;
+    const blob = new Blob([full], { type: "application/msword" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeTitle = (resume.title || "resume").replace(/[^\w\-\s]+/g, "").trim() || "resume";
+    a.href = url;
+    a.download = `${safeTitle}-${Date.now()}.doc`; // Word-compatible HTML
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    showToast("Exported Word (.doc) from preview (no server)", { type: "success", duration: 1800 });
   };
 
   // Fetch server preview with longer debounce to avoid rate limiting

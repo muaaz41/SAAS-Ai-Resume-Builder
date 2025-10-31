@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 
 /**
  * Simple Rich Text Editor Component
@@ -120,6 +120,7 @@ const RichTextEditor = ({
   minHeight = 150,
 }) => {
   const editorRef = useRef(null);
+  const lastEmittedRef = useRef("");
 
   const handleFormat = (command) => {
     document.execCommand(command, false, null);
@@ -129,7 +130,9 @@ const RichTextEditor = ({
   };
 
   const handleInput = (e) => {
-    onChange(e.currentTarget.innerHTML);
+    const html = e.currentTarget.innerHTML;
+    lastEmittedRef.current = html;
+    onChange(html);
   };
 
   const handlePaste = (e) => {
@@ -138,6 +141,14 @@ const RichTextEditor = ({
     const text = e.clipboardData.getData("text/plain");
     document.execCommand("insertText", false, text);
   };
+
+  // Keep DOM in sync only when external value changes (prevents cursor jumps)
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (value !== lastEmittedRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value || "";
+    }
+  }, [value]);
 
   return (
     <div
@@ -155,7 +166,7 @@ const RichTextEditor = ({
         suppressContentEditableWarning
         onInput={handleInput}
         onPaste={handlePaste}
-        dangerouslySetInnerHTML={{ __html: value }}
+        // initial content is set by effect; keep attribute empty to avoid resets every render
         style={{
           padding: 12,
           minHeight: minHeight,

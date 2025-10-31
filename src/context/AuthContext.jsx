@@ -80,7 +80,19 @@ export function AuthProvider({ children }) {
         credentials: "include",
         body: JSON.stringify({ email, password }),
       });
-      if (!res.ok) throw new Error("Login failed");
+      if (!res.ok) {
+        try {
+          const body = await res.json();
+          const msg = body?.message || body?.error || res.statusText || "Login failed";
+          const err = new Error(msg);
+          err.status = res.status;
+          throw err;
+        } catch (e) {
+          const err = new Error(res.statusText || "Login failed");
+          err.status = res.status;
+          throw err;
+        }
+      }
       const { data } = await res.json();
       applyToken(data?.token || null);
       await fetchMe(data?.token || null);
@@ -97,7 +109,20 @@ export function AuthProvider({ children }) {
         credentials: "include",
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Signup failed");
+      if (!res.ok) {
+        try {
+          const body = await res.json();
+          const msg = body?.message || body?.error || res.statusText || "Signup failed";
+          const err = new Error(msg);
+          err.status = res.status;
+          throw err;
+        } catch (e) {
+          // If parsing JSON fails, fallback to status text
+          const err = new Error(res.statusText || "Signup failed");
+          err.status = res.status;
+          throw err;
+        }
+      }
       const { data } = await res.json();
       applyToken(data?.token || null);
       await fetchMe(data?.token || null);

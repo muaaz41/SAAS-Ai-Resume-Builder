@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { api } from "../lib/api.js";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
@@ -6,6 +6,7 @@ import Footer from "./Footer";
 import { useAuth } from "../context/AuthContext.jsx";
 import ResumeUpload from "./ResumeUpload.jsx";
 import TemplateCard from "./TemplateCard.jsx";
+import { showToast } from "../lib/toast";
 
 export default function Dashboard() {
 const navigate = useNavigate();
@@ -811,8 +812,41 @@ resumePreview,
 onClose,
 onSelect,
 }) {
-const [previewHtml, setPreviewHtml] = useState("");
-const [loading, setLoading] = useState(true);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [loading, setLoading] = useState(true);
+  const isExportingRef = useRef(false);
+  const exportClientWord = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (isExportingRef.current) return; // Prevent duplicate calls
+    isExportingRef.current = true;
+    
+    const html = previewHtml || resumePreview || "";
+    if (!html) {
+      showToast("No preview to export.", { type: "error" });
+      isExportingRef.current = false;
+      return;
+    }
+    const full = `<!doctype html><html><head><meta charset="utf-8"><style>@page{margin:1in} body{font-family:Arial,Helvetica,sans-serif}</style></head><body>${html}</body></html>`;
+    const blob = new Blob([full], { type: "application/msword" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const title = (resume?.title || template?.name || "resume").replace(/[^\w\-\s]+/g, "").trim() || "resume";
+    a.href = url;
+    a.download = `${title}-${Date.now()}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    showToast("Exported Word (.doc) from preview", { type: "success", duration: 1800 });
+    
+    // Reset after a short delay to allow download to start
+    setTimeout(() => {
+      isExportingRef.current = false;
+    }, 1000);
+  };
 
 useEffect(() => {
 async function createPreview() {
@@ -1006,7 +1040,7 @@ sandbox="allow-same-origin"
 </div>
 
 {/* Modal Footer */}
-<div
+  <div
 style={{
 padding: "20px",
 borderTop: "1px solid #e5e7eb",
@@ -1027,6 +1061,21 @@ cursor: "pointer",
 }}>
 Cancel
 </button>
+    {resume ? (
+      <button
+        onClick={exportClientWord}
+        style={{
+          padding: "10px 20px",
+          borderRadius: "8px",
+          border: "none",
+          background: "#2563eb",
+          color: "white",
+          fontWeight: "600",
+          cursor: "pointer",
+        }}>
+        Download DOCX
+      </button>
+    ) : null}
 <button
 onClick={() => onSelect(template)}
 style={{

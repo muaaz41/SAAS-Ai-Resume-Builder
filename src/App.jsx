@@ -33,7 +33,14 @@ function App() {
         }
       />
       <Route path="/auth/linkedin/callback" element={<LinkedInCallback />} />
-      <Route path="/ats-checker" element={<ATSChecker />} />
+      <Route
+        path="/ats-checker"
+        element={
+          <ProtectedRoute>
+            <ATSChecker />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

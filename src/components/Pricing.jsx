@@ -1,12 +1,107 @@
-import React from 'react'
-import Navbar from './Navbar'
-import Footer from './Footer'
-import priceMan from '../assets/price_man.png'
-import check from '../assets/check.png'
-import '../css/Pricing.css'
-import { ssrImportKey } from 'vite/module-runner'
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Navbar from "./Navbar";
+import Footer from "./Footer";
+import priceMan from "../assets/price_man.png";
+import check from "../assets/check.png";
+import "../css/Pricing.css";
+import { api } from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const Pricing = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+
+  // Price IDs from Stripe
+  // TODO: Replace these with your actual Stripe Price IDs from Stripe Dashboard
+  // To get Price IDs:
+  // 1. Go to Stripe Dashboard -> Products
+  // 2. Create "Professional Plan" product with $22.99/month recurring price
+  // 3. Create "Premium Plan" product with $32.99/month recurring price
+  // 4. Copy the Price IDs (starts with price_) and replace below
+  // Note: In Vite, use import.meta.env instead of process.env
+  const PRICE_IDS = {
+    professional:
+      import.meta.env.VITE_STRIPE_PRICE_ID_PROFESSIONAL ||
+      "price_1SS8dFBfQooR11qnPROFESSIONAL", // $22.99/month
+    premium:
+      import.meta.env.VITE_STRIPE_PRICE_ID_PREMIUM ||
+      "price_1SS8dFBfQooR11qnPREMIUM", // $32.99/month
+  };
+
+  useEffect(() => {
+    // Fetch subscription status if user is logged in
+    if (user) {
+      fetchSubscriptionStatus();
+    }
+  }, [user]);
+
+  const fetchSubscriptionStatus = async () => {
+    try {
+      const response = await api.get("/api/v1/billing/subscription");
+      setSubscriptionStatus(response.data?.data);
+    } catch (err) {
+      console.error("Failed to fetch subscription status:", err);
+    }
+  };
+
+  const handleCheckout = async (planType) => {
+    if (!user) {
+      navigate("/signin?redirect=/pricing");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const priceId = PRICE_IDS[planType];
+      if (!priceId) {
+        alert("Price ID not configured. Please contact support.");
+        return;
+      }
+
+      const response = await api.post("/api/v1/billing/checkout", { priceId });
+      const checkoutUrl = response.data?.data?.url;
+
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      } else {
+        alert("Failed to create checkout session. Please try again.");
+      }
+    } catch (err) {
+      console.error("Checkout error:", err);
+      let errorMessage = "Failed to start checkout. Please try again.";
+
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      // Show specific error for missing Stripe key
+      if (
+        errorMessage.includes("STRIPE_SECRET_KEY") ||
+        errorMessage.includes("Missing")
+      ) {
+        errorMessage =
+          "Payment system is not configured. Please contact support or try again later.";
+      }
+
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isPlanActive = (planName) => {
+    if (!subscriptionStatus) return false;
+    return (
+      subscriptionStatus.plan === planName &&
+      subscriptionStatus.hasActiveSubscription
+    );
+  };
+
   return (
     <main className="pricing">
       <Navbar />
@@ -15,16 +110,30 @@ const Pricing = () => {
       <section className="pricing-hero">
         <div className="ph-left">
           <h1 className="ph-title">Build Your Future with the Right Plan</h1>
-          <p className="ph-subtitle">Create standout resumes, customize designs, and unlock powerful tools and choose the plan that fits your journey.</p>
+          <p className="ph-subtitle">
+            Create standout resumes, customize designs, and unlock powerful
+            tools and choose the plan that fits your journey.
+          </p>
           <div className="arc-line" />
           <div className="ph-cta">
             <button className="btn-primary">Get Started</button>
-            <a className="btn-secondary" href="#plans">See Plans</a>
+            <a className="btn-secondary" href="#plans">
+              See Plans
+            </a>
           </div>
           <div className="stats-box">
-            <div className="stat"><div className="stat-value">24/7</div><div className="stat-label">Online Support</div></div>
-            <div className="stat"><div className="stat-value">100+</div><div className="stat-label">Professional Templates</div></div>
-            <div className="stat"><div className="stat-value">1K+</div><div className="stat-label">Successful Job Seekers</div></div>
+            <div className="stat">
+              <div className="stat-value">24/7</div>
+              <div className="stat-label">Online Support</div>
+            </div>
+            <div className="stat">
+              <div className="stat-value">100+</div>
+              <div className="stat-label">Professional Templates</div>
+            </div>
+            <div className="stat">
+              <div className="stat-value">1K+</div>
+              <div className="stat-label">Successful Job Seekers</div>
+            </div>
           </div>
         </div>
         <div className="ph-right">
@@ -45,62 +154,191 @@ const Pricing = () => {
       {/* Plans */}
       <section id="plans" className="plans">
         <h2 className="plans-title">Choose Your Plan</h2>
-        <p className="plans-sub">Select the plan that best fits your needs. You can upgrade or downgrade at any time.</p>
+        <p className="plans-sub">
+          Select the plan that best fits your needs. You can upgrade or
+          downgrade at any time.
+        </p>
         <div className="plans-line" />
 
         <div className="plan-grid">
           <div className="plan-card">
             <div className="plan-head">Free</div>
-            <div className="plan-desc">Create and share professional resumes with essential tools to get started.</div>
+            <div className="plan-desc">
+              Create and share professional resumes with essential tools to get
+              started.
+            </div>
             <div className="price">$ 0</div>
             <div className="per">Per User/ month, Billed Yearly.</div>
-            <button className="btn-outline full">Start free trial</button>
+            <button
+              className="btn-outline full"
+              onClick={() => navigate("/signup")}>
+              Start free trial
+            </button>
             <div className="feat-title">What You'll Get</div>
             <ul className="feat-list">
-              <li><img src={check} alt="check" className="check-icon" />Multiple resume templates</li>
-              <li><img src={check} alt="check" className="check-icon" />Version history & easy edits</li>
-              <li><img src={check} alt="check" className="check-icon" />Built-in hosting & shareable link</li>
-              <li><img src={check} alt="check" className="check-icon" />Bulk Status Changes</li>
-              <li><img src={check} alt="check" className="check-icon" />Bulk resume exports (PDF/Word)</li>
-              <li><img src={check} alt="check" className="check-icon" />Limited private projects</li>
-              <li><img src={check} alt="check" className="check-icon" />Custom embeds</li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Multiple resume templates
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Version history & easy edits
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Built-in hosting & shareable link
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Bulk Status Changes
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Bulk resume exports (PDF/Word)
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Limited private projects
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Custom embeds
+              </li>
             </ul>
           </div>
 
           <div className="plan-card popular">
             <div className="ribbon">Most Popular</div>
             <div className="plan-head">Premium</div>
-            <div className="plan-desc">Perfect for professionals who want to stand out with tailored resumes and advanced features.</div>
+            <div className="plan-desc">
+              Perfect for professionals who want to stand out with tailored
+              resumes and advanced features.
+            </div>
             <div className="price">$ 32.99</div>
             <div className="per">Per User/ month, Billed Yearly.</div>
-            <button className="btn-primary full">Get Started</button>
+            {subscriptionStatus && subscriptionStatus.plan && (
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#059669",
+                  marginBottom: "8px",
+                  fontWeight: 600,
+                }}>
+                {subscriptionStatus.plan === "premium" &&
+                subscriptionStatus.hasActiveSubscription
+                  ? "✓ Your Current Plan"
+                  : subscriptionStatus.plan === "professional"
+                  ? "Current: Professional Plan"
+                  : ""}
+              </div>
+            )}
+            <button
+              className="btn-primary full"
+              onClick={() => handleCheckout("premium")}
+              disabled={loading || isPlanActive("premium")}>
+              {loading
+                ? "Processing..."
+                : isPlanActive("premium")
+                ? "Current Plan"
+                : "Get Started"}
+            </button>
             <div className="feat-title">What You'll Get</div>
             <ul className="feat-list">
-              <li><img src={check} alt="check" className="check-icon" />Multiple resume templates</li>
-              <li><img src={check} alt="check" className="check-icon" />Advanced resume templates & layouts</li>
-              <li><img src={check} alt="check" className="check-icon" />Unlimited downloads (PDF/Word)</li>
-              <li><img src={check} alt="check" className="check-icon" />Priority customer support</li>
-              <li><img src={check} alt="check" className="check-icon" />Team collaboration & shared workspace</li>
-              <li><img src={check} alt="check" className="check-icon" />Version history & bulk resume exports</li>
-              <li><img src={check} alt="check" className="check-icon" />Secure cloud hosting & shareable links</li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Multiple resume templates
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Advanced resume templates & layouts
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Unlimited downloads (PDF/Word)
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Priority customer support
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Team collaboration & shared workspace
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Version history & bulk resume exports
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Secure cloud hosting & shareable links
+              </li>
             </ul>
           </div>
 
           <div className="plan-card">
             <div className="plan-head">Professional</div>
-            <div className="plan-desc">For job seekers and career builders who need powerful tools to create standout resumes.</div>
+            <div className="plan-desc">
+              For job seekers and career builders who need powerful tools to
+              create standout resumes.
+            </div>
             <div className="price">$ 22.99</div>
             <div className="per">Per User/ month, Billed Yearly.</div>
-            <button className="btn-outline full">Get Started</button>
+            {subscriptionStatus && subscriptionStatus.plan && (
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#059669",
+                  marginBottom: "8px",
+                  fontWeight: 600,
+                }}>
+                {subscriptionStatus.plan === "professional" &&
+                subscriptionStatus.hasActiveSubscription
+                  ? "✓ Your Current Plan"
+                  : subscriptionStatus.plan === "premium"
+                  ? "Current: Premium Plan"
+                  : ""}
+              </div>
+            )}
+            <button
+              className="btn-outline full"
+              onClick={() => handleCheckout("professional")}
+              disabled={loading || isPlanActive("professional")}>
+              {loading
+                ? "Processing..."
+                : isPlanActive("professional")
+                ? "Current Plan"
+                : "Get Started"}
+            </button>
             <div className="feat-title">What You'll Get</div>
             <ul className="feat-list">
-              <li><img src={check} alt="check" className="check-icon" />Multiple resume templates</li>
-              <li><img src={check} alt="check" className="check-icon" />Unlimited downloads (PDF/Word)</li>
-              <li><img src={check} alt="check" className="check-icon" />AI-powered resume assistance</li>
-              <li><img src={check} alt="check" className="check-icon" />Built-in hosting & shareable links</li>
-              <li><img src={check} alt="check" className="check-icon" />Private workspace with secure storage</li>
-              <li><img src={check} alt="check" className="check-icon" />Version history & easy edits</li>
-              <li><img src={check} alt="check" className="check-icon" />Priority email support</li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Multiple resume templates
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Unlimited downloads (PDF/Word)
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                AI-powered resume assistance
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Built-in hosting & shareable links
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Private workspace with secure storage
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Version history & easy edits
+              </li>
+              <li>
+                <img src={check} alt="check" className="check-icon" />
+                Priority email support
+              </li>
             </ul>
           </div>
         </div>
@@ -108,9 +346,7 @@ const Pricing = () => {
 
       <Footer />
     </main>
-  )
-}
+  );
+};
 
-export default Pricing
-
-
+export default Pricing;

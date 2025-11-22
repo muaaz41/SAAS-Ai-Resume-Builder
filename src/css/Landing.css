@@ -794,6 +794,8 @@ rect: none;
   display: flex;
   gap: clamp(10px, 2vw, 14px);
   align-items: stretch;
+  position: relative;
+  z-index: 6;
 }
 
 .nl-form input {
@@ -835,6 +837,9 @@ rect: none;
   display: flex;
   align-items: center;
   gap: 8px;
+  position: relative;
+  z-index: 10;
+  pointer-events: auto;
 }
 
 .nl-form .btn-primary:hover {
@@ -851,6 +856,7 @@ rect: none;
   height: 220px;
   z-index: 5;
   filter: drop-shadow(0 -10px 30px rgba(0, 0, 0, 0.08));
+  pointer-events: none;
 }
 
 /* FAQ Section */

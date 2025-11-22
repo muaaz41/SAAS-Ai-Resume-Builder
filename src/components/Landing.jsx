@@ -28,10 +28,49 @@ import { useNavigate } from "react-router-dom";
 import "../css/Landing.css";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import { showToast } from "../lib/toast";
+import { api } from "../lib/api.js";
 
 const Landing = () => {
   const [showAllTemplates, setShowAllTemplates] = useState(false);
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [newsletterLoading, setNewsletterLoading] = useState(false);
   const navigate = useNavigate();
+
+  const handleNewsletterSubmit = async (e) => {
+    e.preventDefault();
+    if (!newsletterEmail.trim()) {
+      showToast("Please enter a valid email address", { type: "error" });
+      return;
+    }
+
+    setNewsletterLoading(true);
+    try {
+      // Call backend endpoint to handle Mailchimp subscription (avoids CORS)
+      const response = await api.post("/api/v1/newsletter/subscribe", {
+        email: newsletterEmail.trim(),
+      });
+
+      if (response.data?.success) {
+        showToast(response.data?.message || "Successfully subscribed to our newsletter! 🎉", { type: "success", duration: 3000 });
+        setNewsletterEmail("");
+      } else {
+        showToast(response.data?.message || "Failed to subscribe. Please try again.", { type: "error" });
+      }
+    } catch (error) {
+      console.error("Newsletter subscription error:", error);
+      const errorMessage = error.response?.data?.message || error.message || "Failed to subscribe. Please try again later.";
+      
+      // Handle specific Mailchimp errors
+      if (errorMessage.includes("already subscribed") || errorMessage.includes("Member Exists")) {
+        showToast("This email is already subscribed to our newsletter", { type: "warning" });
+      } else {
+        showToast(errorMessage, { type: "error" });
+      }
+    } finally {
+      setNewsletterLoading(false);
+    }
+  };
 
   return (
     <main className="landing">
@@ -588,10 +627,20 @@ const Landing = () => {
               Subscribe to our newsletter to get updated on our latest and new
               activities
             </p>
-            <form className="nl-form" onSubmit={(e) => e.preventDefault()}>
-              <input type="email" placeholder="Your Email" required />
-              <button type="submit" className="btn-primary">
-                Subscribe now
+            <form className="nl-form" onSubmit={handleNewsletterSubmit}>
+              <input
+                type="email"
+                placeholder="Your Email"
+                value={newsletterEmail}
+                onChange={(e) => setNewsletterEmail(e.target.value)}
+                required
+                disabled={newsletterLoading}
+              />
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={newsletterLoading}>
+                {newsletterLoading ? "Subscribing..." : "Subscribe now"}
               </button>
             </form>
           </div>

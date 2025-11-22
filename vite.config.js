@@ -7,10 +7,10 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://ai-resume-builder-backend-uhdm.onrender.com",
+        target: "http://localhost:4000",
         changeOrigin: true,
         // Ensure cookies set from backend are accepted in dev
-        secure: true,
+        secure: false,
       },
     },
   },

@@ -42,6 +42,9 @@ const cleanResumeData = (data) => {
       ...data.contact,
       // Send plain-text summary to backend templates that expect text
       summary: stripHtml(data.contact?.summary),
+      professionalSummary: stripHtml(
+        data.contact?.professionalSummary || data.contact?.summary
+      ),
     },
     experience: (data.experience || [])
       .filter((e) => e.title || e.company)
@@ -52,6 +55,9 @@ const cleanResumeData = (data) => {
     skills: (data.skills || []).filter(
       (s) => s && (s.name || typeof s === "string")
     ),
+    projects: (data.projects || []).filter((p) => p.name || p.description),
+    hobbies: (data.hobbies || []).filter((h) => h.name),
+    awards: (data.awards || []).filter((a) => a.title),
   };
 };
 
@@ -81,6 +87,8 @@ export default function Builder() {
   const [jobDescription, setJobDescription] = useState("");
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionData, setCompletionData] = useState(null);
+  const [aiGeneratedText, setAiGeneratedText] = useState(""); // For AI-generated text preview
+  const [showAiPreview, setShowAiPreview] = useState(false); // Show/hide AI preview
 
   // typing + rate-limit guards
   const typingRef = useRef(0); // last keystroke timestamp
@@ -135,6 +143,9 @@ export default function Builder() {
         },
       ],
       skills: [],
+      projects: [],
+      hobbies: [],
+      awards: [],
       templateSlug: "modern-slate",
     };
   };
@@ -143,21 +154,35 @@ export default function Builder() {
 
   // Local state for skills input so commas work naturally
   const [skillsInput, setSkillsInput] = useState("");
+  const [skillScoreInput, setSkillScoreInput] = useState("");
 
   // Do not mirror skills back into the input; we keep it user-driven and clear on add
 
   const commitSkillToken = (raw) => {
     const token = (raw || skillsInput).trim();
     if (!token) return;
+    const score = parseInt(skillScoreInput) || undefined;
     setResume((r) => {
-      const existing = (r.skills || []).map((x) => x.name || x);
-      if (existing.includes(token)) return r; // avoid duplicates
+      // Keep original skill objects to preserve scores
+      const existingSkills = (r.skills || []).map((x) => 
+        typeof x === "string" ? { name: x } : x
+      );
+      const existingNames = existingSkills.map((s) => s.name);
+      
+      if (existingNames.includes(token)) return r; // avoid duplicates
+      
+      const newSkill = { name: token };
+      if (score !== undefined && score >= 0 && score <= 100) {
+        newSkill.score = score;
+      }
+      
       return {
         ...r,
-        skills: [...existing.map((n) => ({ name: n })), { name: token }],
+        skills: [...existingSkills, newSkill],
       };
     });
     setSkillsInput("");
+    setSkillScoreInput("");
     markTyping();
   };
 
@@ -379,7 +404,9 @@ export default function Builder() {
     (async () => {
       try {
         const wantedId =
-          location.state?.resumeId || localStorage.getItem("lastResumeId") || null;
+          location.state?.resumeId ||
+          localStorage.getItem("lastResumeId") ||
+          null;
         const [tplRes, resumeRes] = await Promise.all([
           api.get("/api/v1/templates"),
           wantedId
@@ -404,27 +431,32 @@ export default function Builder() {
               const localSaved = JSON.parse(localRaw);
               merged = {
                 ...merged,
-                contact: { ...(merged.contact || {}), ...(localSaved.contact || {}) },
+                contact: {
+                  ...(merged.contact || {}),
+                  ...(localSaved.contact || {}),
+                },
                 experience:
-                  (localSaved.experience && localSaved.experience.length > 0)
+                  localSaved.experience && localSaved.experience.length > 0
                     ? localSaved.experience
-                    : (merged.experience || []),
+                    : merged.experience || [],
                 education:
-                  (localSaved.education && localSaved.education.length > 0)
+                  localSaved.education && localSaved.education.length > 0
                     ? localSaved.education
-                    : (merged.education || []),
-                skills: Array.isArray(localSaved.skills) ? localSaved.skills : (merged.skills || []),
+                    : merged.education || [],
+                skills: Array.isArray(localSaved.skills)
+                  ? localSaved.skills
+                  : merged.skills || [],
                 title: localSaved.title || merged.title,
               };
             }
-          } catch { /* ignore bad local data */ }
+          } catch {
+            /* ignore bad local data */
+          }
 
           const slugFromResume = merged.templateSlug;
           const slugFromLocation = location.state?.templateSlug;
           const finalSlug =
-            slugFromResume ||
-            slugFromLocation ||
-            "modern-slate";
+            slugFromResume || slugFromLocation || "modern-slate";
           const finalT = items.find((x) => x.slug === finalSlug) || null;
           setSelectedTemplate(finalT || null);
 
@@ -476,8 +508,7 @@ export default function Builder() {
         } else {
           const initialSlug =
             location.state?.templateSlug || items[0]?.slug || "modern-slate";
-          const t =
-            items.find((x) => x.slug === initialSlug) || null;
+          const t = items.find((x) => x.slug === initialSlug) || null;
           setSelectedTemplate(t || null);
 
           const finalTemplateSlug = t?.slug || "modern-slate";
@@ -587,7 +618,7 @@ export default function Builder() {
             const edu = {
               degree: e.degree,
               school: e.school,
-              location: e.location,
+              location: e.location || "", // Location is required
               details: e.details || [],
             };
             if (e.startDate) edu.startDate = e.startDate;
@@ -603,15 +634,34 @@ export default function Builder() {
                 : {
                     name: s.name || s,
                     level: typeof s.level === "number" ? s.level : 0,
+                    score: typeof s.score === "number" ? s.score : undefined,
                   }
             )
             .filter((s) => s.name);
         }
+        if (cleanedData.projects?.length > 0) {
+          payload.projects = cleanedData.projects;
+        }
+        if (cleanedData.hobbies?.length > 0) {
+          payload.hobbies = cleanedData.hobbies;
+        }
+        if (cleanedData.awards?.length > 0) {
+          payload.awards = cleanedData.awards;
+        }
         // Debug: Log what we are sending to the backend
         try {
-          console.log("[UPsert] Payload summary length:", (payload.contact?.summary || "").length);
-          console.log("[UPsert] Experience count:", payload.experience?.length || 0);
-          console.log("[UPsert] Education count:", payload.education?.length || 0);
+          console.log(
+            "[UPsert] Payload summary length:",
+            (payload.contact?.summary || "").length
+          );
+          console.log(
+            "[UPsert] Experience count:",
+            payload.experience?.length || 0
+          );
+          console.log(
+            "[UPsert] Education count:",
+            payload.education?.length || 0
+          );
           console.log("[UPsert] Skills count:", payload.skills?.length || 0);
           console.log("[UPsert] Template:", payload.templateSlug);
         } catch {}
@@ -687,8 +737,9 @@ export default function Builder() {
   // ---------- AI helpers ----------
   const generateSummary = async () => {
     if (!jobDescription.trim()) {
-      alert(
-        "Please enter a job description first to help AI generate better content"
+      showToast(
+        "Please enter a job description first to help AI generate better content",
+        { type: "warning" }
       );
       return;
     }
@@ -704,19 +755,42 @@ export default function Builder() {
         res.data?.text ||
         "";
       if (text) {
-        setResume((r) => ({ ...r, contact: { ...r.contact, summary: text } }));
-        alert("✅ AI Summary generated! Check the Summary field.");
+        // Show generated text in editable preview
+        setAiGeneratedText(text);
+        setShowAiPreview(true);
+        showToast(
+          "✅ AI Summary generated! Review and edit below, then click 'Apply to Summary' to use it.",
+          { type: "success", duration: 5000 }
+        );
       } else {
-        alert("AI didn't return any suggestions. Please try again.");
+        showToast("AI didn't return any suggestions. Please try again.", {
+          type: "error",
+        });
       }
     } catch (err) {
       console.error("AI Error:", err);
-      alert(
+      showToast(
         "Failed to generate AI summary: " +
-          (err.response?.data?.message || err.message)
+          (err.response?.data?.message || err.message),
+        { type: "error" }
       );
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const applyAiGeneratedText = () => {
+    if (aiGeneratedText.trim()) {
+      setResume((r) => ({
+        ...r,
+        contact: { ...r.contact, summary: aiGeneratedText },
+      }));
+      setShowAiPreview(false);
+      setAiGeneratedText("");
+      showToast(
+        "✅ AI-generated summary applied! You can continue editing in the Summary field above.",
+        { type: "success" }
+      );
     }
   };
 
@@ -821,6 +895,7 @@ export default function Builder() {
               : {
                   name: s.name || "",
                   level: typeof s.level === "number" ? s.level : 0,
+                  score: typeof s.score === "number" ? s.score : undefined,
                 }
           )
           .filter((s) => s.name);
@@ -828,6 +903,21 @@ export default function Builder() {
       payload.steps.skillsDone = true;
     }
     if (currentStep === 5) {
+      if (resume.projects?.length > 0) {
+        payload.projects = resume.projects;
+      }
+      payload.steps.projectsDone = true;
+    }
+    if (currentStep === 6) {
+      if (resume.hobbies?.length > 0) {
+        payload.hobbies = resume.hobbies;
+      }
+      if (resume.awards?.length > 0) {
+        payload.awards = resume.awards;
+      }
+      payload.steps.hobbiesAwardsDone = true;
+    }
+    if (currentStep === 7) {
       payload.contact = resume.contact;
       payload.steps.summaryDone = true;
     }
@@ -950,7 +1040,10 @@ export default function Builder() {
       // For DOCX, use client-side Word export only (no backend)
       if (format === "docx") {
         exportClientWord();
-        showToast("Exported Word (.doc) from preview (no server)", { type: "success", duration: 1800 });
+        showToast("Exported Word (.doc) from preview (no server)", {
+          type: "success",
+          duration: 1800,
+        });
         // Close modal and redirect similar to server flow
         try {
           setShowCompletionModal(false);
@@ -969,26 +1062,51 @@ export default function Builder() {
         const srv = await api.get(`/api/v1/resumes/${resumeId}`);
         const srvResume = srv?.data?.data?.resume || srv?.data?.data || {};
         console.log("[Export] Server resume template:", srvResume.templateSlug);
-        console.log("[Export] Server contact summary length:", (srvResume.contact?.summary || "").length);
-        console.log("[Export] Server experience count:", Array.isArray(srvResume.experience) ? srvResume.experience.length : 0);
-        console.log("[Export] Server education count:", Array.isArray(srvResume.education) ? srvResume.education.length : 0);
-        console.log("[Export] Server skills count:", Array.isArray(srvResume.skills) ? srvResume.skills.length : 0);
+        console.log(
+          "[Export] Server contact summary length:",
+          (srvResume.contact?.summary || "").length
+        );
+        console.log(
+          "[Export] Server experience count:",
+          Array.isArray(srvResume.experience) ? srvResume.experience.length : 0
+        );
+        console.log(
+          "[Export] Server education count:",
+          Array.isArray(srvResume.education) ? srvResume.education.length : 0
+        );
+        console.log(
+          "[Export] Server skills count:",
+          Array.isArray(srvResume.skills) ? srvResume.skills.length : 0
+        );
         if (format === "docx") {
-          console.log("[Export] DOCX debug — first experience sample:", srvResume.experience?.[0]);
+          console.log(
+            "[Export] DOCX debug — first experience sample:",
+            srvResume.experience?.[0]
+          );
         }
       } catch (e) {
-        console.warn("[Export] Could not fetch server resume before export:", e?.message || e);
+        console.warn(
+          "[Export] Could not fetch server resume before export:",
+          e?.message || e
+        );
       }
 
       // Build URLs (direct backend vs proxied)
-      const backendOrigin = "https://ai-resume-builder-backend-uhdm.onrender.com";
+      const backendOrigin =
+        "https://ai-resume-builder-backend-uhdm.onrender.com";
       const ts = Date.now();
       const tpl = resume.templateSlug || selectedTemplate?.slug || "";
       const templateQS = tpl ? `&templateSlug=${encodeURIComponent(tpl)}` : "";
-      const directUrl = `${backendOrigin}/api/v1/resumes/${resumeId}/export/${format}?t=${ts}${format === "docx" ? templateQS : ""}`;
-      const proxiedUrl = `/api/v1/resumes/${resumeId}/export/${format}?t=${ts}${format === "docx" ? templateQS : ""}`;
+      const directUrl = `${backendOrigin}/api/v1/resumes/${resumeId}/export/${format}?t=${ts}${
+        format === "docx" ? templateQS : ""
+      }`;
+      const proxiedUrl = `/api/v1/resumes/${resumeId}/export/${format}?t=${ts}${
+        format === "docx" ? templateQS : ""
+      }`;
 
-      const isLocal = /localhost|127\.0\.0\.1|::1/.test(window.location.hostname);
+      const isLocal = /localhost|127\.0\.0\.1|::1/.test(
+        window.location.hostname
+      );
 
       let res;
       try {
@@ -1000,7 +1118,10 @@ export default function Builder() {
           withCredentials: true,
         });
       } catch (firstErr) {
-        console.warn("Direct export failed, retrying via proxied URL:", firstErr?.message || firstErr);
+        console.warn(
+          "Direct export failed, retrying via proxied URL:",
+          firstErr?.message || firstErr
+        );
         // Fallback to proxied path
         res = await api.get(proxiedUrl, {
           responseType: format === "txt" ? "text" : "blob",
@@ -1010,7 +1131,12 @@ export default function Builder() {
       }
 
       // Debug: ensure we actually received a Blob for PDF/DOCX
-      console.log("isBlob:", res.data instanceof Blob, "blobType:", res.data?.type);
+      console.log(
+        "isBlob:",
+        res.data instanceof Blob,
+        "blobType:",
+        res.data?.type
+      );
 
       console.log("Export response:", res);
       console.log("Response status:", res.status);
@@ -1024,7 +1150,10 @@ export default function Builder() {
       if (format === "docx") {
         try {
           const headBuf = await res.data.slice(0, 8).arrayBuffer();
-          console.log("[Export] DOCX header bytes:", Array.from(new Uint8Array(headBuf)));
+          console.log(
+            "[Export] DOCX header bytes:",
+            Array.from(new Uint8Array(headBuf))
+          );
         } catch {}
       }
 
@@ -1037,8 +1166,14 @@ export default function Builder() {
           : "text/plain";
 
       // If server sent HTML/JSON error, surface it before saving a bad file
-      const headerCT = res.headers?.["content-type"] || res.headers?.get?.("content-type");
-      if (format !== "txt" && headerCT && !headerCT.includes("pdf") && !headerCT.includes("word")) {
+      const headerCT =
+        res.headers?.["content-type"] || res.headers?.get?.("content-type");
+      if (
+        format !== "txt" &&
+        headerCT &&
+        !headerCT.includes("pdf") &&
+        !headerCT.includes("word")
+      ) {
         try {
           const txt = await res.data.text();
           console.error("Unexpected content-type:", headerCT, txt);
@@ -1064,7 +1199,14 @@ export default function Builder() {
         const head = await fileBlob.slice(0, 5).arrayBuffer();
         const b = new Uint8Array(head);
         const badPdf =
-          format === "pdf" && !(b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46 && b[4] === 0x2d);
+          format === "pdf" &&
+          !(
+            b[0] === 0x25 &&
+            b[1] === 0x50 &&
+            b[2] === 0x44 &&
+            b[3] === 0x46 &&
+            b[4] === 0x2d
+          );
         const badDocx = format === "docx" && !(b[0] === 0x50 && b[1] === 0x4b);
         if (badPdf || badDocx) {
           console.warn("Unexpected file header:", Array.from(b));
@@ -1072,16 +1214,24 @@ export default function Builder() {
           try {
             const txt = await fileBlob.text();
             const maybeJson = JSON.parse(txt);
-            if (maybeJson && typeof maybeJson === "object" && !Array.isArray(maybeJson)) {
+            if (
+              maybeJson &&
+              typeof maybeJson === "object" &&
+              !Array.isArray(maybeJson)
+            ) {
               const keys = Object.keys(maybeJson)
                 .map((k) => parseInt(k, 10))
                 .filter((n) => Number.isFinite(n))
                 .sort((a, b) => a - b);
               if (keys.length > 0) {
                 const uint8 = new Uint8Array(keys.length);
-                for (let i = 0; i < keys.length; i++) uint8[i] = maybeJson[keys[i]] & 0xff;
+                for (let i = 0; i < keys.length; i++)
+                  uint8[i] = maybeJson[keys[i]] & 0xff;
                 fileBlob = new Blob([uint8], { type: mimeType });
-                console.log("Reconstructed binary from JSON bytes (length)", keys.length);
+                console.log(
+                  "Reconstructed binary from JSON bytes (length)",
+                  keys.length
+                );
               } else {
                 alert("Export failed: received invalid file data.");
                 setExporting(false);
@@ -1095,7 +1245,10 @@ export default function Builder() {
               return;
             }
           } catch (reconstructErr) {
-            console.error("Failed to reconstruct binary from JSON:", reconstructErr);
+            console.error(
+              "Failed to reconstruct binary from JSON:",
+              reconstructErr
+            );
             alert("Export failed: invalid file format from server.");
             setExporting(false);
             setExportingFormat(null);
@@ -1110,7 +1263,9 @@ export default function Builder() {
       const a = document.createElement("a");
       a.href = url;
       // Timestamp filename to avoid OS preview/cache reusing stale file
-      const safeTitle = (resume.title || "resume").replace(/[^\w\-\s]+/g, "").trim() || "resume";
+      const safeTitle =
+        (resume.title || "resume").replace(/[^\w\-\s]+/g, "").trim() ||
+        "resume";
       a.download = `${safeTitle}-${Date.now()}.${format}`;
       document.body.appendChild(a);
       a.click();
@@ -1125,11 +1280,18 @@ export default function Builder() {
       }
       // Fallback for DOCX that looks too small (often summary-only)
       if (format === "docx" && (fileBlob?.size || 0) < 12000) {
-        console.warn("[Export] DOCX blob appears small (", fileBlob?.size, ") — falling back to client Word .doc export.");
+        console.warn(
+          "[Export] DOCX blob appears small (",
+          fileBlob?.size,
+          ") — falling back to client Word .doc export."
+        );
         exportClientWord();
         return;
       }
-      showToast(`Resume exported as ${format.toUpperCase()}. Redirecting…`, { type: "success", duration: 1800 });
+      showToast(`Resume exported as ${format.toUpperCase()}. Redirecting…`, {
+        type: "success",
+        duration: 1800,
+      });
       // Close modal if open and redirect to dashboard after successful download
       try {
         setShowCompletionModal(false);
@@ -1137,15 +1299,37 @@ export default function Builder() {
       setTimeout(() => navigate("/dashboard"), 300);
     } catch (err) {
       console.error("Export error:", err);
+
+      // Handle payment required error (402)
+      if (err?.response?.status === 402) {
+        const errorMessage =
+          err?.response?.data?.message ||
+          "Upgrade required to download resumes";
+        const shouldUpgrade = window.confirm(
+          `${errorMessage}\n\nUpgrade to Professional or Premium plan to download your resume in PDF, DOCX, or TXT format.\n\nWould you like to upgrade now?`
+        );
+        if (shouldUpgrade) {
+          navigate("/pricing");
+        }
+        setExporting(false);
+        setExportingFormat(null);
+        return;
+      }
       if (format === "docx") {
         // Fallback to client-side Word export if server DOCX fails
-        showToast("Server DOCX failed. Exporting Word (.doc) from preview…", { type: "warning", duration: 2200 });
+        showToast("Server DOCX failed. Exporting Word (.doc) from preview…", {
+          type: "warning",
+          duration: 2200,
+        });
         try {
           exportClientWord();
           return;
         } catch (_) {}
       }
-      showToast(`Failed to export as ${format.toUpperCase()}. Please try again.`, { type: "error" });
+      showToast(
+        `Failed to export as ${format.toUpperCase()}. Please try again.`,
+        { type: "error" }
+      );
     } finally {
       setExporting(false);
       setExportingFormat(null);
@@ -1242,14 +1426,18 @@ export default function Builder() {
     const blob = new Blob([full], { type: "application/msword" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const safeTitle = (resume.title || "resume").replace(/[^\w\-\s]+/g, "").trim() || "resume";
+    const safeTitle =
+      (resume.title || "resume").replace(/[^\w\-\s]+/g, "").trim() || "resume";
     a.href = url;
     a.download = `${safeTitle}-${Date.now()}.doc`; // Word-compatible HTML
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
-    showToast("Exported Word (.doc) from preview (no server)", { type: "success", duration: 1800 });
+    showToast("Exported Word (.doc) from preview (no server)", {
+      type: "success",
+      duration: 1800,
+    });
   };
 
   // Fetch server preview with longer debounce to avoid rate limiting
@@ -1453,12 +1641,22 @@ export default function Builder() {
     .join(", ");
 
   // ---------- UI ----------
-  const stepTitles = ["Basics", "Experience", "Education", "Skills", "Summary"];
+  const stepTitles = [
+    "Basics",
+    "Experience",
+    "Education",
+    "Skills",
+    "Projects",
+    "Hobbies/Awards",
+    "Summary",
+  ];
   const stepSubtitles = [
     "Basic information and contact details",
     "Add your work experience and achievements",
     "Your educational background",
     "List your key skills and expertise",
+    "Showcase your projects",
+    "Add hobbies, awards, or achievements",
     "Write a compelling professional summary",
   ];
 
@@ -1482,7 +1680,7 @@ export default function Builder() {
 
         {/* Stepper */}
         <div style={S.stepperWrap}>
-          {[1, 2, 3, 4, 5].map((i, idx) => (
+          {[1, 2, 3, 4, 5, 6, 7].map((i, idx) => (
             <React.Fragment key={i}>
               <div
                 title={stepTitles[i - 1]}
@@ -1490,7 +1688,7 @@ export default function Builder() {
                 onClick={() => setStep(i)}>
                 {i}
               </div>
-              {idx < 4 && <div style={S.stepLine(i < step)} />}
+              {idx < 6 && <div style={S.stepLine(i < step)} />}
             </React.Fragment>
           ))}
         </div>
@@ -1578,15 +1776,60 @@ export default function Builder() {
               />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={S.label}>Location</label>
+              <label style={S.label}>Location *</label>
               <input
                 placeholder="New York, NY"
                 style={S.input}
-                value={resume.contact.address}
+                value={resume.contact.location || ""}
                 onChange={(e) => {
                   setResume((r) => ({
                     ...r,
-                    contact: { ...r.contact, address: e.target.value },
+                    contact: { ...r.contact, location: e.target.value },
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={S.label}>GitHub</label>
+              <input
+                placeholder="https://github.com/username"
+                style={S.input}
+                value={resume.contact.github || ""}
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
+                    contact: { ...r.contact, github: e.target.value },
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={S.label}>LinkedIn</label>
+              <input
+                placeholder="https://linkedin.com/in/username"
+                style={S.input}
+                value={resume.contact.linkedin || ""}
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
+                    contact: { ...r.contact, linkedin: e.target.value },
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={S.label}>Portfolio Link</label>
+              <input
+                placeholder="https://yourportfolio.com"
+                style={S.input}
+                value={resume.contact.portfolioLink || ""}
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
+                    contact: { ...r.contact, portfolioLink: e.target.value },
                   }));
                   markTyping();
                 }}
@@ -1597,7 +1840,7 @@ export default function Builder() {
               <input
                 placeholder="Product Designer (UX/UI)"
                 style={S.input}
-                value={resume.contact.headline}
+                value={resume.contact.headline || ""}
                 onChange={(e) => {
                   setResume((r) => ({
                     ...r,
@@ -1821,7 +2064,13 @@ export default function Builder() {
             {resume.experience.length > 1 && (
               <button
                 type="button"
-                style={{ ...S.btnGhost, marginTop: 8, marginLeft: 8, borderColor: "#fecaca", color: "#dc2626" }}
+                style={{
+                  ...S.btnGhost,
+                  marginTop: 8,
+                  marginLeft: 8,
+                  borderColor: "#fecaca",
+                  color: "#dc2626",
+                }}
                 onClick={() =>
                   setResume((r) => ({
                     ...r,
@@ -1834,11 +2083,18 @@ export default function Builder() {
             {resume.experience.length > 0 && (
               <button
                 type="button"
-                style={{ ...S.btnGhost, marginTop: 8, marginLeft: 8, borderColor: "#fecaca", color: "#dc2626" }}
+                style={{
+                  ...S.btnGhost,
+                  marginTop: 8,
+                  marginLeft: 8,
+                  borderColor: "#fecaca",
+                  color: "#dc2626",
+                }}
                 onClick={() =>
                   setResume((r) => ({
                     ...r,
-                    experience: r.experience.length > 1 ? [r.experience[0]] : [],
+                    experience:
+                      r.experience.length > 1 ? [r.experience[0]] : [],
                   }))
                 }>
                 Clear Added Positions
@@ -1881,18 +2137,27 @@ export default function Builder() {
                   />
                 </div>
                 <div style={{ marginBottom: 12 }}>
-                  <label style={S.label}>Location</label>
+                  <label style={S.label}>Location *</label>
                   <input
                     placeholder="New York, NY"
                     style={S.input}
-                    value={edu.location}
+                    value={edu.location || ""}
                     onChange={(e) => {
                       const newEdu = [...resume.education];
                       newEdu[idx].location = e.target.value;
                       setResume((r) => ({ ...r, education: newEdu }));
                       markTyping();
                     }}
+                    required
                   />
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "#64748b",
+                      marginTop: "4px",
+                    }}>
+                    Location is required for education
+                  </div>
                 </div>
                 <div style={{ ...S.grid2, marginBottom: 12 }}>
                   <div>
@@ -1980,7 +2245,13 @@ export default function Builder() {
             {resume.education.length > 1 && (
               <button
                 type="button"
-                style={{ ...S.btnGhost, marginTop: 8, marginLeft: 8, borderColor: "#fecaca", color: "#dc2626" }}
+                style={{
+                  ...S.btnGhost,
+                  marginTop: 8,
+                  marginLeft: 8,
+                  borderColor: "#fecaca",
+                  color: "#dc2626",
+                }}
                 onClick={() =>
                   setResume((r) => ({
                     ...r,
@@ -1993,7 +2264,13 @@ export default function Builder() {
             {resume.education.length > 0 && (
               <button
                 type="button"
-                style={{ ...S.btnGhost, marginTop: 8, marginLeft: 8, borderColor: "#fecaca", color: "#dc2626" }}
+                style={{
+                  ...S.btnGhost,
+                  marginTop: 8,
+                  marginLeft: 8,
+                  borderColor: "#fecaca",
+                  color: "#dc2626",
+                }}
                 onClick={() =>
                   setResume((r) => ({
                     ...r,
@@ -2015,43 +2292,411 @@ export default function Builder() {
                 {(resume.skills || [])
                   .map((s) => s.name || s)
                   .filter(Boolean)
-                  .map((name, i) => (
-                    <span
-                      key={`${name}-${i}`}
-                      style={S.chip}
-                      onClick={() => removeSkill(name)}
-                      title="Remove">
-                      {name}
-                      <span style={{ fontWeight: 700, lineHeight: 1 }}>×</span>
-                    </span>
-                  ))}
+                  .map((name, i) => {
+                    const skill = resume.skills[i];
+                    return (
+                      <span
+                        key={`${name}-${i}`}
+                        style={S.chip}
+                        onClick={() => removeSkill(name)}
+                        title={`Remove${
+                          skill?.score ? ` (Score: ${skill.score})` : ""
+                        }`}>
+                        {name}
+                        {skill?.score ? ` (${skill.score})` : ""}
+                        <span style={{ fontWeight: 700, lineHeight: 1 }}>
+                          ×
+                        </span>
+                      </span>
+                    );
+                  })}
               </div>
               <div style={{ marginTop: 10 }}>
-                <label style={S.label}>Add a skill (press Enter to add)</label>
-                <input
-                  style={S.input}
-                  value={skillsInput}
-                  placeholder="Type a skill and press Enter"
-                  onChange={(e) => setSkillsInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
+                <label style={S.label}>Add a skill (press Enter to continue to score)</label>
+                <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                  <input
+                    id="skill-name-input"
+                    style={{ ...S.input, flex: 1 }}
+                    value={skillsInput}
+                    placeholder="Type a skill and press Enter"
+                    onChange={(e) => setSkillsInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        // If skill name is entered, move focus to score field
+                        if (skillsInput.trim()) {
+                          const scoreInput = document.getElementById('skill-score-input');
+                          if (scoreInput) {
+                            scoreInput.focus();
+                          }
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Only commit if focus is NOT moving to the score input
+                      const scoreInput = document.getElementById('skill-score-input');
+                      if (e.relatedTarget !== scoreInput) {
+                        commitSkillToken();
+                      }
+                    }}
+                  />
+                  <input
+                    id="skill-score-input"
+                    type="number"
+                    min="0"
+                    max="100"
+                    style={{ ...S.input, width: "80px" }}
+                    placeholder="Score"
+                    value={skillScoreInput}
+                    onChange={(e) => setSkillScoreInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitSkillToken();
+                      }
+                    }}
+                    onBlur={() => {
+                      // When leaving the score field, commit the skill
                       commitSkillToken();
-                      setSkillsInput("");
-                    }
-                  }}
-                  onBlur={() => {
-                    commitSkillToken();
-                    setSkillsInput("");
-                  }}
-                />
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "#64748b",
+                    marginTop: "4px",
+                  }}>
+                  Type skill name → Press Enter → Add optional score (0-100) → Press Enter to add
+                </div>
               </div>
             </div>
           </>
         )}
 
-        {/* STEP 5: SUMMARY */}
+        {/* STEP 5: PROJECTS */}
         {step === 5 && (
+          <>
+            {resume.projects && resume.projects.length > 0 ? (
+              resume.projects.map((proj, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    marginBottom: 24,
+                    padding: "16px",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "8px",
+                  }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={S.label}>Project Name *</label>
+                    <input
+                      placeholder="E-commerce Website"
+                      style={S.input}
+                      value={proj.name || ""}
+                      onChange={(e) => {
+                        const newProjects = [...(resume.projects || [])];
+                        newProjects[idx] = {
+                          ...newProjects[idx],
+                          name: e.target.value,
+                        };
+                        setResume((r) => ({ ...r, projects: newProjects }));
+                        markTyping();
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={S.label}>Description</label>
+                    <textarea
+                      placeholder="Describe the project, technologies used, and your role..."
+                      style={{
+                        ...S.input,
+                        minHeight: "100px",
+                        resize: "vertical",
+                      }}
+                      value={proj.description || ""}
+                      onChange={(e) => {
+                        const newProjects = [...(resume.projects || [])];
+                        newProjects[idx] = {
+                          ...newProjects[idx],
+                          description: e.target.value,
+                        };
+                        setResume((r) => ({ ...r, projects: newProjects }));
+                        markTyping();
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={S.label}>Link</label>
+                    <input
+                      placeholder="https://project-url.com"
+                      style={S.input}
+                      value={proj.link || ""}
+                      onChange={(e) => {
+                        const newProjects = [...(resume.projects || [])];
+                        newProjects[idx] = {
+                          ...newProjects[idx],
+                          link: e.target.value,
+                        };
+                        setResume((r) => ({ ...r, projects: newProjects }));
+                        markTyping();
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      ...S.btnGhost,
+                      borderColor: "#fecaca",
+                      color: "#dc2626",
+                    }}
+                    onClick={() => {
+                      const newProjects = resume.projects.filter(
+                        (_, i) => i !== idx
+                      );
+                      setResume((r) => ({ ...r, projects: newProjects }));
+                      markTyping();
+                    }}>
+                    Remove Project
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div
+                style={{
+                  color: "#64748b",
+                  fontSize: "14px",
+                  marginBottom: "16px",
+                }}>
+                No projects added yet. Click "Add Project" to get started.
+              </div>
+            )}
+            <button
+              type="button"
+              style={S.btnGhost}
+              onClick={() => {
+                setResume((r) => ({
+                  ...r,
+                  projects: [
+                    ...(r.projects || []),
+                    { name: "", description: "", link: "" },
+                  ],
+                }));
+                markTyping();
+              }}>
+              + Add Project
+            </button>
+          </>
+        )}
+
+        {/* STEP 6: HOBBIES / AWARDS */}
+        {step === 6 && (
+          <>
+            <div style={{ marginBottom: 24 }}>
+              <h3
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 600,
+                  marginBottom: "16px",
+                }}>
+                Hobbies
+              </h3>
+              {resume.hobbies && resume.hobbies.length > 0 ? (
+                resume.hobbies.map((hobby, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      marginBottom: 12,
+                      padding: "12px",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                    }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "8px",
+                        alignItems: "center",
+                      }}>
+                      <input
+                        placeholder="Photography"
+                        style={{ ...S.input, flex: 1 }}
+                        value={hobby.name || ""}
+                        onChange={(e) => {
+                          const newHobbies = [...(resume.hobbies || [])];
+                          newHobbies[idx] = {
+                            ...newHobbies[idx],
+                            name: e.target.value,
+                          };
+                          setResume((r) => ({ ...r, hobbies: newHobbies }));
+                          markTyping();
+                        }}
+                      />
+                      <button
+                        type="button"
+                        style={{
+                          ...S.btnGhost,
+                          borderColor: "#fecaca",
+                          color: "#dc2626",
+                          padding: "8px 12px",
+                        }}
+                        onClick={() => {
+                          const newHobbies = resume.hobbies.filter(
+                            (_, i) => i !== idx
+                          );
+                          setResume((r) => ({ ...r, hobbies: newHobbies }));
+                          markTyping();
+                        }}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: "14px",
+                    marginBottom: "16px",
+                  }}>
+                  No hobbies added yet.
+                </div>
+              )}
+              <button
+                type="button"
+                style={S.btnGhost}
+                onClick={() => {
+                  setResume((r) => ({
+                    ...r,
+                    hobbies: [...(r.hobbies || []), { name: "" }],
+                  }));
+                  markTyping();
+                }}>
+                + Add Hobby
+              </button>
+            </div>
+
+            <div style={{ marginTop: 32, marginBottom: 24 }}>
+              <h3
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 600,
+                  marginBottom: "16px",
+                }}>
+                Awards / Achievements
+              </h3>
+              {resume.awards && resume.awards.length > 0 ? (
+                resume.awards.map((award, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      marginBottom: 16,
+                      padding: "16px",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                    }}>
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={S.label}>Title *</label>
+                      <input
+                        placeholder="Employee of the Year"
+                        style={S.input}
+                        value={award.title || ""}
+                        onChange={(e) => {
+                          const newAwards = [...(resume.awards || [])];
+                          newAwards[idx] = {
+                            ...newAwards[idx],
+                            title: e.target.value,
+                          };
+                          setResume((r) => ({ ...r, awards: newAwards }));
+                          markTyping();
+                        }}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={S.label}>Description</label>
+                      <textarea
+                        placeholder="Describe the award or achievement..."
+                        style={{
+                          ...S.input,
+                          minHeight: "80px",
+                          resize: "vertical",
+                        }}
+                        value={award.description || ""}
+                        onChange={(e) => {
+                          const newAwards = [...(resume.awards || [])];
+                          newAwards[idx] = {
+                            ...newAwards[idx],
+                            description: e.target.value,
+                          };
+                          setResume((r) => ({ ...r, awards: newAwards }));
+                          markTyping();
+                        }}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={S.label}>Issuer</label>
+                      <input
+                        placeholder="Company Name"
+                        style={S.input}
+                        value={award.issuer || ""}
+                        onChange={(e) => {
+                          const newAwards = [...(resume.awards || [])];
+                          newAwards[idx] = {
+                            ...newAwards[idx],
+                            issuer: e.target.value,
+                          };
+                          setResume((r) => ({ ...r, awards: newAwards }));
+                          markTyping();
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      style={{
+                        ...S.btnGhost,
+                        borderColor: "#fecaca",
+                        color: "#dc2626",
+                      }}
+                      onClick={() => {
+                        const newAwards = resume.awards.filter(
+                          (_, i) => i !== idx
+                        );
+                        setResume((r) => ({ ...r, awards: newAwards }));
+                        markTyping();
+                      }}>
+                      Remove Award
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: "14px",
+                    marginBottom: "16px",
+                  }}>
+                  No awards added yet.
+                </div>
+              )}
+              <button
+                type="button"
+                style={S.btnGhost}
+                onClick={() => {
+                  setResume((r) => ({
+                    ...r,
+                    awards: [
+                      ...(r.awards || []),
+                      { title: "", description: "", issuer: "" },
+                    ],
+                  }));
+                  markTyping();
+                }}>
+                + Add Award / Achievement
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* STEP 7: SUMMARY */}
+        {step === 7 && (
           <>
             <div style={{ marginBottom: 12 }}>
               <label style={S.label}>
@@ -2072,18 +2717,26 @@ export default function Builder() {
                 placeholder="Write a compelling professional summary. Highlight your key achievements, skills, and career goals. Use the toolbar to format your text with bold, italic, or bullet points."
                 minHeight={150}
               />
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: 8,
+                }}>
                 <button
                   type="button"
-                  style={{ ...S.btnGhost, borderColor: "#fecaca", color: "#dc2626" }}
+                  style={{
+                    ...S.btnGhost,
+                    borderColor: "#fecaca",
+                    color: "#dc2626",
+                  }}
                   onClick={() => {
                     setResume((r) => ({
                       ...r,
                       contact: { ...r.contact, summary: "" },
                     }));
                     markTyping();
-                  }}
-                >
+                  }}>
                   Clear Summary
                 </button>
               </div>
@@ -2133,6 +2786,79 @@ export default function Builder() {
                 disabled={aiLoading}>
                 {aiLoading ? "🔄 Generating..." : "✨ Generate Summary with AI"}
               </button>
+
+              {/* AI Generated Text Preview - Editable */}
+              {showAiPreview && aiGeneratedText && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    background: "#f0fdf4",
+                    border: "2px solid #86efac",
+                    borderRadius: 8,
+                  }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#166534",
+                      marginBottom: 8,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}>
+                    ✨ AI Generated Summary (Editable)
+                  </div>
+                  <textarea
+                    value={aiGeneratedText}
+                    onChange={(e) => setAiGeneratedText(e.target.value)}
+                    placeholder="AI-generated text will appear here. You can edit it before applying."
+                    style={{
+                      width: "100%",
+                      minHeight: "120px",
+                      padding: 12,
+                      border: "1px solid #86efac",
+                      borderRadius: 6,
+                      fontSize: 14,
+                      lineHeight: 1.6,
+                      fontFamily: "inherit",
+                      resize: "vertical",
+                      background: "#fff",
+                      color: "#0f172a",
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      marginTop: 8,
+                    }}>
+                    <button
+                      type="button"
+                      onClick={applyAiGeneratedText}
+                      style={{
+                        ...S.btnSolid,
+                        background: "#16a34a",
+                        flex: 1,
+                      }}>
+                      ✅ Apply to Summary
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAiPreview(false);
+                        setAiGeneratedText("");
+                      }}
+                      style={{
+                        ...S.btnGhost,
+                        borderColor: "#fecaca",
+                        color: "#dc2626",
+                      }}>
+                      ✖ Discard
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -2157,10 +2883,10 @@ export default function Builder() {
             style={S.btnSolid}
             onClick={async () => {
               await markStepDone(step);
-              if (step < 5) setStep((s) => s + 1);
+              if (step < 7) setStep((s) => s + 1);
               else await handleCompletion();
             }}>
-            {step === 5 ? "Complete Resume" : "Next Step"}
+            {step === 7 ? "Complete Resume" : "Next Step"}
           </button>
         </div>
       </div>
@@ -2320,7 +3046,13 @@ export default function Builder() {
 // ------------------------------
 // Completion Modal Component
 // ------------------------------
-function CompletionModal({ data, onClose, onExport, exporting, exportingFormat }) {
+function CompletionModal({
+  data,
+  onClose,
+  onExport,
+  exporting,
+  exportingFormat,
+}) {
   const { resume, previewHtml, template, resumeId } = data;
 
   // Define formatDate function
@@ -2597,30 +3329,37 @@ function CompletionModal({ data, onClose, onExport, exporting, exportingFormat }
             </div>
           </div>
         </div>
-        <div style={{
-          padding: "16px 32px",
-          borderTop: "1px solid #e5e7eb",
-          position: "sticky",
-          bottom: 0,
-          background: "#fff",
-        }}>
+        <div
+          style={{
+            padding: "16px 32px",
+            borderTop: "1px solid #e5e7eb",
+            position: "sticky",
+            bottom: 0,
+            background: "#fff",
+          }}>
           <button
             style={{ ...S.btnSolid, width: "100%" }}
             onClick={() => onExport("pdf")}
             disabled={exporting && exportingFormat === "pdf"}>
-            {exporting && exportingFormat === "pdf" ? "Exporting..." : "Download PDF"}
+            {exporting && exportingFormat === "pdf"
+              ? "Exporting..."
+              : "Download PDF"}
           </button>
           <button
             style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
             onClick={() => onExport("docx")}
             disabled={exporting && exportingFormat === "docx"}>
-            {exporting && exportingFormat === "docx" ? "Exporting..." : "Download DOCX"}
+            {exporting && exportingFormat === "docx"
+              ? "Exporting..."
+              : "Download DOCX"}
           </button>
           <button
             style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
             onClick={() => onExport("txt")}
             disabled={exporting && exportingFormat === "txt"}>
-            {exporting && exportingFormat === "txt" ? "Exporting..." : "Download TXT"}
+            {exporting && exportingFormat === "txt"
+              ? "Exporting..."
+              : "Download TXT"}
           </button>
           <button
             style={{ ...S.btnGhost, width: "100%", marginTop: 10 }}

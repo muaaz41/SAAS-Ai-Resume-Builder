@@ -11,7 +11,8 @@ const TemplateCard = ({ template, isPremium = false, onSelect, onPreview }) => {
   const slug = template?.slug || "default";
   // Resolve thumbnail URL to a reliable absolute/relative path that works in all envs
   const rawThumb =
-    typeof template?.thumbnailUrl === "string" && template.thumbnailUrl.length > 0
+    typeof template?.thumbnailUrl === "string" &&
+    template.thumbnailUrl.length > 0
       ? template.thumbnailUrl
       : null;
 
@@ -163,7 +164,7 @@ const TemplateCard = ({ template, isPremium = false, onSelect, onPreview }) => {
           <iframe
             title={`${name} preview`}
             src={previewSrc}
-            sandbox="allow-same-origin"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
             loading="lazy"
             style={{
               width: "100%",
@@ -192,232 +193,62 @@ const TemplateCard = ({ template, isPremium = false, onSelect, onPreview }) => {
             }}
           />
         ) : (
-        <>
-        {/* Shimmer Effect */}
-        <div
-          style={{
-            position: "absolute",
-            top: "-50%",
-            right: "-50%",
-            width: "200%",
-            height: "200%",
-            background:
-              "radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)",
-            animation: "shimmer 4s infinite",
-          }}
-        />
-
-        {/* Layout-specific mockup rendering */}
-        {layout.type === "modern" && (
           <>
-            {/* Modern Layout - Full header with left accent */}
-            <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-              <div
-                style={{
-                  width: "4px",
-                  height: "32px",
-                  background: accentColor,
-                  borderRadius: "2px",
-                }}
-              />
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    height: "16px",
-                    background: accentColor,
-                    borderRadius: "3px",
-                    width: "70%",
-                    marginBottom: "4px",
-                  }}
-                />
-                <div
-                  style={{
-                    height: "12px",
-                    background: `${accentColor}60`,
-                    borderRadius: "2px",
-                    width: "50%",
-                  }}
-                />
-              </div>
-            </div>
+            {/* Shimmer Effect */}
             <div
               style={{
-                height: "10px",
-                background: `${accentColor}30`,
-                borderRadius: "2px",
-                width: "85%",
-                marginBottom: "6px",
+                position: "absolute",
+                top: "-50%",
+                right: "-50%",
+                width: "200%",
+                height: "200%",
+                background:
+                  "radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)",
+                animation: "shimmer 4s infinite",
               }}
             />
-            <div
-              style={{
-                height: "10px",
-                background: `${accentColor}30`,
-                borderRadius: "2px",
-                width: "75%",
-                marginBottom: "8px",
-              }}
-            />
-            <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: "6px",
-                    height: "6px",
-                    background: accentColor,
-                    borderRadius: "50%",
-                  }}
-                />
-              ))}
-            </div>
-          </>
-        )}
 
-        {layout.type === "classic" && (
-          <>
-            {/* Classic Layout - Centered header with top bar */}
-            <div
-              style={{
-                height: "3px",
-                background: accentColor,
-                borderRadius: "2px",
-                width: "100%",
-                marginBottom: "8px",
-              }}
-            />
-            <div
-              style={{
-                textAlign: "center",
-                marginBottom: "8px",
-              }}>
-              <div
-                style={{
-                  height: "18px",
-                  background: accentColor,
-                  borderRadius: "4px",
-                  width: "60%",
-                  margin: "0 auto 4px",
-                }}
-              />
-              <div
-                style={{
-                  height: "12px",
-                  background: `${accentColor}50`,
-                  borderRadius: "2px",
-                  width: "40%",
-                  margin: "0 auto",
-                }}
-              />
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "8px",
-              }}>
-              <div>
+            {/* Layout-specific mockup rendering */}
+            {layout.type === "modern" && (
+              <>
+                {/* Modern Layout - Full header with left accent */}
+                <div
+                  style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                  <div
+                    style={{
+                      width: "4px",
+                      height: "32px",
+                      background: accentColor,
+                      borderRadius: "2px",
+                    }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        height: "16px",
+                        background: accentColor,
+                        borderRadius: "3px",
+                        width: "70%",
+                        marginBottom: "4px",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: "12px",
+                        background: `${accentColor}60`,
+                        borderRadius: "2px",
+                        width: "50%",
+                      }}
+                    />
+                  </div>
+                </div>
                 <div
                   style={{
                     height: "10px",
                     background: `${accentColor}30`,
                     borderRadius: "2px",
-                    width: "90%",
-                    marginBottom: "4px",
-                  }}
-                />
-                <div
-                  style={{
-                    height: "10px",
-                    background: `${accentColor}30`,
-                    borderRadius: "2px",
-                    width: "70%",
-                  }}
-                />
-              </div>
-              <div>
-                <div
-                  style={{
-                    height: "10px",
-                    background: `${accentColor}30`,
-                    borderRadius: "2px",
-                    width: "80%",
-                    marginBottom: "4px",
-                  }}
-                />
-                <div
-                  style={{
-                    height: "10px",
-                    background: `${accentColor}30`,
-                    borderRadius: "2px",
-                    width: "60%",
-                  }}
-                />
-              </div>
-            </div>
-          </>
-        )}
-
-        {layout.type === "elegant" && (
-          <>
-            {/* Elegant Layout - Sidebar design */}
-            <div style={{ display: "flex", gap: "8px", height: "100%" }}>
-              <div
-                style={{
-                  width: "30%",
-                  background: accentColor,
-                  borderRadius: "4px",
-                  padding: "8px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "4px",
-                }}>
-                <div
-                  style={{
-                    height: "12px",
-                    background: "rgba(255,255,255,0.8)",
-                    borderRadius: "2px",
-                    width: "100%",
-                  }}
-                />
-                <div
-                  style={{
-                    height: "8px",
-                    background: "rgba(255,255,255,0.6)",
-                    borderRadius: "2px",
-                    width: "80%",
-                  }}
-                />
-                <div
-                  style={{
-                    height: "8px",
-                    background: "rgba(255,255,255,0.6)",
-                    borderRadius: "2px",
-                    width: "70%",
-                  }}
-                />
-              </div>
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "4px",
-                }}>
-                <div
-                  style={{
-                    height: "14px",
-                    background: `${accentColor}40`,
-                    borderRadius: "3px",
-                    width: "80%",
-                  }}
-                />
-                <div
-                  style={{
-                    height: "10px",
-                    background: `${accentColor}30`,
-                    borderRadius: "2px",
-                    width: "90%",
+                    width: "85%",
+                    marginBottom: "6px",
                   }}
                 />
                 <div
@@ -426,250 +257,421 @@ const TemplateCard = ({ template, isPremium = false, onSelect, onPreview }) => {
                     background: `${accentColor}30`,
                     borderRadius: "2px",
                     width: "75%",
+                    marginBottom: "8px",
+                  }}
+                />
+                <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      style={{
+                        width: "6px",
+                        height: "6px",
+                        background: accentColor,
+                        borderRadius: "50%",
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {layout.type === "classic" && (
+              <>
+                {/* Classic Layout - Centered header with top bar */}
+                <div
+                  style={{
+                    height: "3px",
+                    background: accentColor,
+                    borderRadius: "2px",
+                    width: "100%",
+                    marginBottom: "8px",
+                  }}
+                />
+                <div
+                  style={{
+                    textAlign: "center",
+                    marginBottom: "8px",
+                  }}>
+                  <div
+                    style={{
+                      height: "18px",
+                      background: accentColor,
+                      borderRadius: "4px",
+                      width: "60%",
+                      margin: "0 auto 4px",
+                    }}
+                  />
+                  <div
+                    style={{
+                      height: "12px",
+                      background: `${accentColor}50`,
+                      borderRadius: "2px",
+                      width: "40%",
+                      margin: "0 auto",
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "8px",
+                  }}>
+                  <div>
+                    <div
+                      style={{
+                        height: "10px",
+                        background: `${accentColor}30`,
+                        borderRadius: "2px",
+                        width: "90%",
+                        marginBottom: "4px",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: "10px",
+                        background: `${accentColor}30`,
+                        borderRadius: "2px",
+                        width: "70%",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        height: "10px",
+                        background: `${accentColor}30`,
+                        borderRadius: "2px",
+                        width: "80%",
+                        marginBottom: "4px",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: "10px",
+                        background: `${accentColor}30`,
+                        borderRadius: "2px",
+                        width: "60%",
+                      }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {layout.type === "elegant" && (
+              <>
+                {/* Elegant Layout - Sidebar design */}
+                <div style={{ display: "flex", gap: "8px", height: "100%" }}>
+                  <div
+                    style={{
+                      width: "30%",
+                      background: accentColor,
+                      borderRadius: "4px",
+                      padding: "8px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}>
+                    <div
+                      style={{
+                        height: "12px",
+                        background: "rgba(255,255,255,0.8)",
+                        borderRadius: "2px",
+                        width: "100%",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: "8px",
+                        background: "rgba(255,255,255,0.6)",
+                        borderRadius: "2px",
+                        width: "80%",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: "8px",
+                        background: "rgba(255,255,255,0.6)",
+                        borderRadius: "2px",
+                        width: "70%",
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}>
+                    <div
+                      style={{
+                        height: "14px",
+                        background: `${accentColor}40`,
+                        borderRadius: "3px",
+                        width: "80%",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: "10px",
+                        background: `${accentColor}30`,
+                        borderRadius: "2px",
+                        width: "90%",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: "10px",
+                        background: `${accentColor}30`,
+                        borderRadius: "2px",
+                        width: "75%",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: "10px",
+                        background: `${accentColor}30`,
+                        borderRadius: "2px",
+                        width: "85%",
+                      }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {layout.type === "professional" && (
+              <>
+                {/* Professional Layout - Grid with underlines */}
+                <div
+                  style={{
+                    height: "16px",
+                    background: accentColor,
+                    borderRadius: "3px",
+                    width: "70%",
+                    marginBottom: "6px",
+                  }}
+                />
+                <div
+                  style={{
+                    height: "2px",
+                    background: accentColor,
+                    borderRadius: "1px",
+                    width: "100%",
+                    marginBottom: "8px",
+                  }}
+                />
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "6px",
+                  }}>
+                  {[1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      style={{
+                        height: "8px",
+                        background: `${accentColor}25`,
+                        borderRadius: "2px",
+                        width: "100%",
+                      }}
+                    />
+                  ))}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "4px",
+                    marginTop: "8px",
+                    flexWrap: "wrap",
+                  }}>
+                  {["JS", "React", "Node"].map((skill, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        padding: "2px 6px",
+                        background: `${accentColor}20`,
+                        borderRadius: "8px",
+                        fontSize: "8px",
+                        color: accentColor,
+                        fontWeight: "600",
+                      }}>
+                      {skill}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {layout.type === "creative" && (
+              <>
+                {/* Creative Layout - Asymmetric with geometric accents */}
+                <div style={{ position: "relative" }}>
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "0",
+                      right: "0",
+                      width: "20px",
+                      height: "20px",
+                      background: accentColor,
+                      borderRadius: "50%",
+                      opacity: 0.7,
+                    }}
+                  />
+                  <div
+                    style={{
+                      height: "18px",
+                      background: accentColor,
+                      borderRadius: "4px",
+                      width: "60%",
+                      marginBottom: "6px",
+                      clipPath: "polygon(0 0, 90% 0, 100% 100%, 0 100%)",
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    height: "10px",
+                    background: `${accentColor}40`,
+                    borderRadius: "2px",
+                    width: "80%",
+                    marginBottom: "4px",
+                    transform: "skew(-5deg)",
                   }}
                 />
                 <div
                   style={{
                     height: "10px",
-                    background: `${accentColor}30`,
+                    background: `${accentColor}40`,
                     borderRadius: "2px",
-                    width: "85%",
+                    width: "70%",
+                    marginBottom: "4px",
+                    transform: "skew(5deg)",
                   }}
                 />
-              </div>
-            </div>
-          </>
-        )}
-
-        {layout.type === "professional" && (
-          <>
-            {/* Professional Layout - Grid with underlines */}
-            <div
-              style={{
-                height: "16px",
-                background: accentColor,
-                borderRadius: "3px",
-                width: "70%",
-                marginBottom: "6px",
-              }}
-            />
-            <div
-              style={{
-                height: "2px",
-                background: accentColor,
-                borderRadius: "1px",
-                width: "100%",
-                marginBottom: "8px",
-              }}
-            />
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "6px",
-              }}>
-              {[1, 2, 3, 4].map((i) => (
                 <div
-                  key={i}
+                  style={{
+                    display: "flex",
+                    gap: "4px",
+                    marginTop: "8px",
+                    alignItems: "center",
+                  }}>
+                  <div
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      background: accentColor,
+                      borderRadius: "2px",
+                      transform: "rotate(45deg)",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      background: accentColor,
+                      borderRadius: "50%",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      background: accentColor,
+                      borderRadius: "2px",
+                      transform: "rotate(-45deg)",
+                    }}
+                  />
+                </div>
+              </>
+            )}
+
+            {layout.type === "minimal" && (
+              <>
+                {/* Minimal Layout - Clean and simple */}
+                <div
+                  style={{
+                    height: "20px",
+                    background: accentColor,
+                    borderRadius: "2px",
+                    width: "80%",
+                    marginBottom: "12px",
+                  }}
+                />
+                <div
+                  style={{
+                    height: "1px",
+                    background: `${accentColor}30`,
+                    width: "100%",
+                    marginBottom: "8px",
+                  }}
+                />
+                <div
                   style={{
                     height: "8px",
-                    background: `${accentColor}25`,
-                    borderRadius: "2px",
-                    width: "100%",
+                    background: `${accentColor}20`,
+                    borderRadius: "1px",
+                    width: "90%",
+                    marginBottom: "4px",
                   }}
                 />
-              ))}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: "4px",
-                marginTop: "8px",
-                flexWrap: "wrap",
-              }}>
-              {["JS", "React", "Node"].map((skill, i) => (
                 <div
-                  key={i}
                   style={{
-                    padding: "2px 6px",
+                    height: "8px",
                     background: `${accentColor}20`,
-                    borderRadius: "8px",
-                    fontSize: "8px",
-                    color: accentColor,
-                    fontWeight: "600",
+                    borderRadius: "1px",
+                    width: "85%",
+                    marginBottom: "4px",
+                  }}
+                />
+                <div
+                  style={{
+                    height: "8px",
+                    background: `${accentColor}20`,
+                    borderRadius: "1px",
+                    width: "75%",
+                    marginBottom: "8px",
+                  }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    marginTop: "8px",
                   }}>
-                  {skill}
+                  <div
+                    style={{
+                      width: "4px",
+                      height: "4px",
+                      background: accentColor,
+                      borderRadius: "50%",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: "4px",
+                      height: "4px",
+                      background: accentColor,
+                      borderRadius: "50%",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: "4px",
+                      height: "4px",
+                      background: accentColor,
+                      borderRadius: "50%",
+                    }}
+                  />
                 </div>
-              ))}
-            </div>
+              </>
+            )}
           </>
-        )}
-
-        {layout.type === "creative" && (
-          <>
-            {/* Creative Layout - Asymmetric with geometric accents */}
-            <div style={{ position: "relative" }}>
-              <div
-                style={{
-                  position: "absolute",
-                  top: "0",
-                  right: "0",
-                  width: "20px",
-                  height: "20px",
-                  background: accentColor,
-                  borderRadius: "50%",
-                  opacity: 0.7,
-                }}
-              />
-              <div
-                style={{
-                  height: "18px",
-                  background: accentColor,
-                  borderRadius: "4px",
-                  width: "60%",
-                  marginBottom: "6px",
-                  clipPath: "polygon(0 0, 90% 0, 100% 100%, 0 100%)",
-                }}
-              />
-            </div>
-            <div
-              style={{
-                height: "10px",
-                background: `${accentColor}40`,
-                borderRadius: "2px",
-                width: "80%",
-                marginBottom: "4px",
-                transform: "skew(-5deg)",
-              }}
-            />
-            <div
-              style={{
-                height: "10px",
-                background: `${accentColor}40`,
-                borderRadius: "2px",
-                width: "70%",
-                marginBottom: "4px",
-                transform: "skew(5deg)",
-              }}
-            />
-            <div
-              style={{
-                display: "flex",
-                gap: "4px",
-                marginTop: "8px",
-                alignItems: "center",
-              }}>
-              <div
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  background: accentColor,
-                  borderRadius: "2px",
-                  transform: "rotate(45deg)",
-                }}
-              />
-              <div
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  background: accentColor,
-                  borderRadius: "50%",
-                }}
-              />
-              <div
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  background: accentColor,
-                  borderRadius: "2px",
-                  transform: "rotate(-45deg)",
-                }}
-              />
-            </div>
-          </>
-        )}
-
-        {layout.type === "minimal" && (
-          <>
-            {/* Minimal Layout - Clean and simple */}
-            <div
-              style={{
-                height: "20px",
-                background: accentColor,
-                borderRadius: "2px",
-                width: "80%",
-                marginBottom: "12px",
-              }}
-            />
-            <div
-              style={{
-                height: "1px",
-                background: `${accentColor}30`,
-                width: "100%",
-                marginBottom: "8px",
-              }}
-            />
-            <div
-              style={{
-                height: "8px",
-                background: `${accentColor}20`,
-                borderRadius: "1px",
-                width: "90%",
-                marginBottom: "4px",
-              }}
-            />
-            <div
-              style={{
-                height: "8px",
-                background: `${accentColor}20`,
-                borderRadius: "1px",
-                width: "85%",
-                marginBottom: "4px",
-              }}
-            />
-            <div
-              style={{
-                height: "8px",
-                background: `${accentColor}20`,
-                borderRadius: "1px",
-                width: "75%",
-                marginBottom: "8px",
-              }}
-            />
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                marginTop: "8px",
-              }}>
-              <div
-                style={{
-                  width: "4px",
-                  height: "4px",
-                  background: accentColor,
-                  borderRadius: "50%",
-                }}
-              />
-              <div
-                style={{
-                  width: "4px",
-                  height: "4px",
-                  background: accentColor,
-                  borderRadius: "50%",
-                }}
-              />
-              <div
-                style={{
-                  width: "4px",
-                  height: "4px",
-                  background: accentColor,
-                  borderRadius: "50%",
-                }}
-              />
-            </div>
-          </>
-        )}
-        </>
         )}
       </div>
 

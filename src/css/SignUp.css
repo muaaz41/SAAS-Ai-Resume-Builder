@@ -148,6 +148,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   
   .divider {
     text-align: center;
+    justify-content: center;
     margin: 10px 0;
   }
   

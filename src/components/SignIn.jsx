@@ -29,9 +29,10 @@ const SignIn = () => {
       showToast("Welcome back!", { type: "success", duration: 2500 });
       navigate("/dashboard");
     } catch (err) {
-      const msg = err?.status === 401 || /invalid/i.test(err?.message || "")
-        ? "Invalid email or password"
-        : err?.message || "Login failed";
+      const msg =
+        err?.status === 401 || /invalid/i.test(err?.message || "")
+          ? "Invalid email or password"
+          : err?.message || "Login failed";
       showToast(msg);
       setError(msg);
     } finally {
@@ -61,15 +62,33 @@ const SignIn = () => {
               <GoogleLogin
                 onSuccess={async (cred) => {
                   const idToken = cred.credential;
-                  if (!idToken) return;
+                  if (!idToken) {
+                    setError("No ID token received from Google");
+                    return;
+                  }
                   try {
+                    setLoading(true);
+                    setError("");
                     await loginWithGoogle(idToken);
+                    showToast("Welcome! Signed in with Google", {
+                      type: "success",
+                    });
                     navigate("/dashboard");
                   } catch (e) {
-                    setError("Google sign-in failed");
+                    console.error("Google login error:", e);
+                    const errorMsg =
+                      e?.message || "Google sign-in failed. Please try again.";
+                    setError(errorMsg);
+                    showToast(errorMsg, { type: "error" });
+                  } finally {
+                    setLoading(false);
                   }
                 }}
-                onError={() => setError("Google sign-in failed")}
+                onError={(error) => {
+                  console.error("Google OAuth error:", error);
+                  setError("Google sign-in was canceled or failed");
+                  showToast("Google sign-in failed", { type: "error" });
+                }}
               />
             </div>
           ) : (

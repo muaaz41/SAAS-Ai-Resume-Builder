@@ -65,7 +65,7 @@ api.interceptors.response.use(
         try {
           // Try to refresh token
           const refreshUrl = API_BASE
-            ? `${API_BASE}/auth/refresh`
+            ? `${API_BASE}/api/v1/auth/refresh`
             : "/api/v1/auth/refresh";
 
           const r = await fetch(refreshUrl, {

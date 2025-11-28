@@ -83,7 +83,8 @@ export function AuthProvider({ children }) {
       if (!res.ok) {
         try {
           const body = await res.json();
-          const msg = body?.message || body?.error || res.statusText || "Login failed";
+          const msg =
+            body?.message || body?.error || res.statusText || "Login failed";
           const err = new Error(msg);
           err.status = res.status;
           throw err;
@@ -112,7 +113,8 @@ export function AuthProvider({ children }) {
       if (!res.ok) {
         try {
           const body = await res.json();
-          const msg = body?.message || body?.error || res.statusText || "Signup failed";
+          const msg =
+            body?.message || body?.error || res.statusText || "Signup failed";
           const err = new Error(msg);
           err.status = res.status;
           throw err;
@@ -174,6 +176,13 @@ export function AuthProvider({ children }) {
     [applyToken, fetchMe]
   );
 
+  const refreshUser = useCallback(async () => {
+    const token = getAccessToken();
+    if (token) {
+      await fetchMe(token);
+    }
+  }, [fetchMe]);
+
   const value = useMemo(
     () => ({
       token,
@@ -183,6 +192,7 @@ export function AuthProvider({ children }) {
       signup,
       logout,
       refresh,
+      refreshUser,
       loginWithGoogle,
       loginWithLinkedIn,
     }),
@@ -194,6 +204,7 @@ export function AuthProvider({ children }) {
       signup,
       logout,
       refresh,
+      refreshUser,
       loginWithGoogle,
       loginWithLinkedIn,
     ]

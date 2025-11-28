@@ -22,7 +22,9 @@ const Navbar = () => {
         {/* Desktop Navigation */}
         <nav className="nav-links">
           <Link to="/">Home</Link>
-          <Link to="/builder">Resume Builder</Link>
+          <Link to="/builder" state={{ startFresh: true }}>
+            Resume Builder
+          </Link>
           <Link to="/ats-checker">ATS Checker</Link>
           <Link to="/dashboard">User Dashboard</Link>
           <Link to="/pricing">Pricing Plan</Link>
@@ -39,7 +41,10 @@ const Navbar = () => {
               <button className="btn-outline" onClick={logout}>
                 Logout
               </button>
-              <Link className="btn-solid" to="/builder">
+              <Link
+                className="btn-solid"
+                to="/builder"
+                state={{ startFresh: true }}>
                 Open Builder
               </Link>
             </>
@@ -69,7 +74,10 @@ const Navbar = () => {
           <Link to="/" onClick={toggleMobileMenu}>
             Home
           </Link>
-          <Link to="/builder" onClick={toggleMobileMenu}>
+          <Link
+            to="/builder"
+            state={{ startFresh: true }}
+            onClick={toggleMobileMenu}>
             Resume Builder
           </Link>
           <Link to="/ats-checker" onClick={toggleMobileMenu}>
@@ -96,6 +104,7 @@ const Navbar = () => {
               <Link
                 className="btn-solid"
                 to="/builder"
+                state={{ startFresh: true }}
                 onClick={toggleMobileMenu}>
                 Open Builder
               </Link>

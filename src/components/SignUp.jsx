@@ -1,20 +1,23 @@
 import React, { useState } from "react";
 import "../css/SignUp.css";
 import signUpImage from "../assets/img1.jpg";
-import googleIcon from "../assets/plus.png";
+import googleIcon from "../assets/google.png";
 import linkedinIcon from "../assets/linkedin.png";
 import { useAuth } from "../context/AuthContext.jsx";
-import { showToast } from "../lib/toast";
-import { GoogleLogin } from "@react-oauth/google";
 import { useNavigate } from "react-router-dom";
+import { showToast } from "../lib/toast";
+import {
+  GoogleLogin,
+  googleLogout,
+  hasGrantedAnyScopeGoogle,
+} from "@react-oauth/google";
 
 const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const today = new Date().toISOString().split("T")[0];
   const [name, setName] = useState("");
-  const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [dob, setDob] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { signup, loginWithGoogle } = useAuth();
@@ -25,19 +28,27 @@ const SignUp = () => {
     setError("");
     setLoading(true);
     try {
-      await signup({ name, email, password, dob });
-      showToast("Account created! You're in.", { type: "success", duration: 2500 });
+      const payload = {
+        name,
+        email,
+        password,
+      };
+      if (dob) {
+        payload.dob = dob;
+      }
+      await signup(payload);
+      showToast("Account created successfully!", {
+        type: "success",
+        duration: 2500,
+      });
       navigate("/dashboard");
     } catch (err) {
-      const msg = err?.message || "Signup failed";
-      // Show a friendly toast for known conflicts
-      if (err?.status === 409 || /already/i.test(msg)) {
-        showToast("Email already in use. Try logging in with this account.");
-        setError("");
-      } else {
-        showToast(msg);
-        setError(msg);
-      }
+      const msg =
+        err?.status === 409 || /already/i.test(err?.message || "")
+          ? "Email already in use"
+          : err?.message || "Signup failed";
+      showToast(msg);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -48,76 +59,7 @@ const SignUp = () => {
       <div className="left-section">
         <div className="signup-form-container">
           <h1 className="signup-title">Sign up</h1>
-          <p className="signup-subtitle">
-            Sign up to enjoy the feature of Revolutie
-          </p>
-
-          {error && (
-            <div style={{ color: "red", marginBottom: 12 }}>{error}</div>
-          )}
-          <form className="signup-form" onSubmit={onSubmit}>
-            <div className="form-group">
-              <label className="form-label">Your Name</label>
-              <input
-                type="text"
-                className="form-input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Date of Birth</label>
-              <div className="date-input-container">
-                <input
-                  type="date"
-                  className="form-input date-input"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  min="1900-01-01"
-                  max={today}
-                  aria-label="Date of Birth"
-                />
-                <span className="calendar-icon">📅</span>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <input
-                type="email"
-                className="form-input email-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <div className="password-input-container">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  className="form-input password-input"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}>
-                  👁
-                </button>
-              </div>
-            </div>
-
-            <button type="submit" className="signup-btn" disabled={loading}>
-              {loading ? "Signing up..." : "Sign up"}
-            </button>
-          </form>
-
-          <div className="divider">
-            <span className="divider-text">OR</span>
-          </div>
+          <p className="signup-subtitle">Create your account to get started</p>
 
           <div className="social-buttons">
             {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
@@ -131,15 +73,34 @@ const SignUp = () => {
                 <GoogleLogin
                   onSuccess={async (cred) => {
                     const idToken = cred.credential;
-                    if (!idToken) return;
+                    if (!idToken) {
+                      setError("No ID token received from Google");
+                      return;
+                    }
                     try {
+                      setLoading(true);
+                      setError("");
                       await loginWithGoogle(idToken);
+                      showToast("Welcome! Signed up with Google", {
+                        type: "success",
+                      });
                       navigate("/dashboard");
                     } catch (e) {
-                      setError("Google sign-in failed");
+                      console.error("Google login error:", e);
+                      const errorMsg =
+                        e?.message ||
+                        "Google sign-in failed. Please try again.";
+                      setError(errorMsg);
+                      showToast(errorMsg, { type: "error" });
+                    } finally {
+                      setLoading(false);
                     }
                   }}
-                  onError={() => setError("Google sign-in failed")}
+                  onError={(error) => {
+                    console.error("Google OAuth error:", error);
+                    setError("Google sign-in was canceled or failed");
+                    showToast("Google sign-in failed", { type: "error" });
+                  }}
                 />
               </div>
             ) : (
@@ -184,20 +145,79 @@ const SignUp = () => {
                 />
                 Continue with LinkedIn
               </button>
-            ) : (
-              <button
-                className="linkedin-signup-btn"
-                disabled
-                title="Missing LinkedIn client id">
-                <img
-                  src={linkedinIcon}
-                  alt="LinkedIn"
-                  className="social-icon"
-                />
-                Continue with LinkedIn
-              </button>
-            )}
+            ) : null}
           </div>
+
+          <div className="divider">
+            <span className="divider-text">OR</span>
+          </div>
+
+          {error && (
+            <div style={{ color: "red", marginBottom: 12 }}>{error}</div>
+          )}
+          <form className="signup-form" onSubmit={onSubmit}>
+            <div className="form-group">
+              <label className="form-label">Full Name</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Enter your full name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Email address</label>
+              <input
+                type="email"
+                className={`form-input ${email ? "email-input" : ""}`}
+                placeholder="Enter your email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Date of Birth (Optional)</label>
+              <div className="date-input-container">
+                <input
+                  type="date"
+                  className="form-input date-input"
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                />
+                <span className="calendar-icon">📅</span>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Password</label>
+              <div className="password-input-container">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="form-input password-input"
+                  placeholder="Create a password (min 6 characters)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  minLength={6}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? "Hide" : "👁"}
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" className="signup-btn" disabled={loading}>
+              {loading ? "Creating account..." : "Sign up"}
+            </button>
+          </form>
 
           <div className="signin-link">
             Already have an account? <a href="/signin">Sign in</a>

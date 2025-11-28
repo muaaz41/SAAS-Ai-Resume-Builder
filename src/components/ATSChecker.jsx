@@ -17,6 +17,13 @@ const ATSChecker = () => {
   const [error, setError] = useState(null);
   const [jobDescription, setJobDescription] = useState("");
 
+  const handleRemoveFile = () => {
+    setUploadedFile(null);
+    setAtsResults(null);
+    setAtsScore(null);
+    setError(null);
+  };
+
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -86,10 +93,37 @@ const ATSChecker = () => {
       );
 
       const parsedData = parseResponse.data?.data || parseResponse.data;
-      const resumeText = parsedData.rawText || "";
+      let resumeText = parsedData.rawText || "";
 
-      if (!resumeText) {
-        throw new Error("Could not extract text from resume file");
+      // If rawText is limited, try to reconstruct from structured data
+      if (!resumeText || resumeText.length < 50) {
+        // Try to build text from structured data
+        const parts = [];
+        if (parsedData.contact) {
+          if (parsedData.contact.fullName)
+            parts.push(parsedData.contact.fullName);
+          if (parsedData.contact.summary)
+            parts.push(parsedData.contact.summary);
+        }
+        if (parsedData.experience && Array.isArray(parsedData.experience)) {
+          parsedData.experience.forEach((exp) => {
+            if (exp.title) parts.push(exp.title);
+            if (exp.company) parts.push(exp.company);
+            if (exp.bullets) parts.push(...exp.bullets);
+          });
+        }
+        if (parsedData.skills && Array.isArray(parsedData.skills)) {
+          parsedData.skills.forEach((s) => {
+            if (s.name) parts.push(s.name);
+          });
+        }
+        resumeText = parts.join(" ");
+      }
+
+      if (!resumeText || resumeText.trim().length < 10) {
+        throw new Error(
+          "Could not extract sufficient text from resume file. Please ensure the file is not corrupted and contains readable text."
+        );
       }
 
       // Then use the ATS check API with the extracted text
@@ -115,10 +149,22 @@ const ATSChecker = () => {
       }
     } catch (err) {
       console.error("ATS Check Error:", err);
-      setError(
-        err.response?.data?.message ||
-          "Failed to analyze resume. Please try again."
-      );
+      let errorMessage = "Failed to analyze resume. Please try again.";
+
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      } else if (err.response?.status === 500) {
+        errorMessage =
+          "Server error. Please try again later or contact support.";
+      } else if (err.response?.status === 400) {
+        errorMessage = "Invalid request. Please check your file and try again.";
+      }
+
+      setError(errorMessage);
+      setAtsResults(null);
+      setAtsScore(null);
     } finally {
       setIsAnalyzing(false);
     }
@@ -272,7 +318,32 @@ const ATSChecker = () => {
                     {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
                   </div>
                 </div>
-                {isAnalyzing && <div className="analyzing">Analyzing...</div>}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    marginLeft: "auto",
+                  }}>
+                  {isAnalyzing ? (
+                    <div className="analyzing">Analyzing...</div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRemoveFile}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: "8px",
+                        border: "1px solid #e2e8f0",
+                        background: "#fff",
+                        color: "#dc2626",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}>
+                      Remove file
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -376,15 +447,57 @@ const ATSChecker = () => {
                       {atsResults.keywords.description ||
                         "This section analyzes the presence and relevance of keywords from the job description in your resume."}
                     </div>
+                    {atsResults.keywords.matchedKeywords &&
+                      Array.isArray(atsResults.keywords.matchedKeywords) &&
+                      atsResults.keywords.matchedKeywords.length > 0 && (
+                        <div
+                          className="matched-keywords"
+                          style={{ marginTop: "12px" }}>
+                          <strong style={{ color: "#15803d" }}>
+                            Matched Keywords:
+                          </strong>
+                          <div
+                            className="keyword-tags"
+                            style={{ marginTop: "8px" }}>
+                            {atsResults.keywords.matchedKeywords.map(
+                              (keyword, index) => (
+                                <span
+                                  key={index}
+                                  className="keyword-tag"
+                                  style={{
+                                    backgroundColor: "#d1fae5",
+                                    color: "#065f46",
+                                    border: "1px solid #a7f3d0",
+                                  }}>
+                                  {keyword}
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )}
                     {atsResults.keywords.missingKeywords &&
                       Array.isArray(atsResults.keywords.missingKeywords) &&
                       atsResults.keywords.missingKeywords.length > 0 && (
-                        <div className="missing-keywords">
-                          <strong>Missing Keywords:</strong>
-                          <div className="keyword-tags">
+                        <div
+                          className="missing-keywords"
+                          style={{ marginTop: "12px" }}>
+                          <strong style={{ color: "#dc2626" }}>
+                            Missing Keywords:
+                          </strong>
+                          <div
+                            className="keyword-tags"
+                            style={{ marginTop: "8px" }}>
                             {atsResults.keywords.missingKeywords.map(
                               (keyword, index) => (
-                                <span key={index} className="keyword-tag">
+                                <span
+                                  key={index}
+                                  className="keyword-tag"
+                                  style={{
+                                    backgroundColor: "#fee2e2",
+                                    color: "#991b1b",
+                                    border: "1px solid #fecaca",
+                                  }}>
                                   {keyword}
                                 </span>
                               )
@@ -407,6 +520,27 @@ const ATSChecker = () => {
                       {atsResults.formatting.description ||
                         "Analyzes resume structure, fonts, and formatting compatibility with ATS systems."}
                     </div>
+                    {atsResults.formatting.issues &&
+                      Array.isArray(atsResults.formatting.issues) &&
+                      atsResults.formatting.issues.length > 0 && (
+                        <div
+                          className="formatting-issues"
+                          style={{ marginTop: "12px" }}>
+                          <strong>Issues Found:</strong>
+                          <ul style={{ marginTop: "8px", paddingLeft: "20px" }}>
+                            {atsResults.formatting.issues.map((issue, idx) => (
+                              <li
+                                key={idx}
+                                style={{
+                                  marginBottom: "4px",
+                                  color: "#dc2626",
+                                }}>
+                                {issue}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                   </div>
                 )}
 

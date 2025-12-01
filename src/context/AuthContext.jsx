@@ -46,10 +46,17 @@ export function AuthProvider({ children }) {
     }
     try {
       const res = await api.get("/api/v1/auth/me");
-      setUser(res.data?.data?.user || null);
-      return res.data?.data?.user || null;
-    } catch {
-      setUser(null);
+      const user = res.data?.data?.user || null;
+      setUser(user);
+      return user;
+    } catch (err) {
+      // Only clear user if it's a real auth error (401), not network errors
+      // This prevents clearing user state during temporary network issues
+      if (err.response?.status === 401) {
+        setUser(null);
+      }
+      // For other errors (network, 500, etc.), keep existing user state
+      // This prevents logout during temporary issues
       return null;
     }
   }, []);

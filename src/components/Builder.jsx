@@ -3065,7 +3065,7 @@ export default function Builder() {
               <label style={S.label}>
                 Professional Summary{" "}
                 <span style={{ fontSize: 11, color: "#64748b", marginLeft: 8 }}>
-                  (Use toolbar to format text)
+                  (Edit anywhere, add bullets with • Insert Bullet button or Ctrl+Shift+8)
                 </span>
               </label>
               <RichTextEditor
@@ -3077,7 +3077,7 @@ export default function Builder() {
                   }));
                   markTyping();
                 }}
-                placeholder="Write a compelling professional summary. Highlight your key achievements, skills, and career goals. Use the toolbar to format your text with bold, italic, or bullet points."
+                placeholder="Write a compelling professional summary. Click anywhere to edit, use the toolbar to format text, or press '• Insert Bullet' to add bullet points anywhere in your text."
                 minHeight={150}
               />
               <div

@@ -88,7 +88,7 @@ const Landing = () => {
           <div className="hero-cta-row">
             <button
               className="btn-primary"
-              onClick={() => navigate("/builder")}>
+              onClick={() => navigate("/resume-start")}>
               Get Started Free
             </button>
             <div className="active-users">

@@ -16,6 +16,7 @@ const ATSChecker = () => {
   const [atsResults, setAtsResults] = useState(null);
   const [error, setError] = useState(null);
   const [jobDescription, setJobDescription] = useState("");
+  const [progress, setProgress] = useState(0);
 
   const handleRemoveFile = () => {
     setUploadedFile(null);
@@ -76,12 +77,15 @@ const ATSChecker = () => {
 
     setIsAnalyzing(true);
     setError(null);
+    setProgress(0);
 
     try {
-      // First, parse the resume to get text content
+      // Step 1: Parse the resume (0-40%)
+      setProgress(10);
       const parseFormData = new FormData();
       parseFormData.append("file", uploadedFile);
 
+      setProgress(20);
       const parseResponse = await api.post(
         "/api/v1/files/parse",
         parseFormData,
@@ -92,6 +96,7 @@ const ATSChecker = () => {
         }
       );
 
+      setProgress(40);
       const parsedData = parseResponse.data?.data || parseResponse.data;
       let resumeText = parsedData.rawText || "";
 
@@ -126,20 +131,25 @@ const ATSChecker = () => {
         );
       }
 
-      // Then use the ATS check API with the extracted text
+      // Step 2: Analyze with ATS (40-90%)
+      setProgress(50);
       const atsPayload = {
         resumeText: resumeText,
         jobDescription: jobDescription.trim() || "",
       };
 
+      setProgress(60);
       const response = await api.post("/api/v1/ats/check", atsPayload, {
         headers: {
           "Content-Type": "application/json",
         },
       });
 
+      setProgress(80);
       const results = response.data?.data || response.data;
 
+      // Step 3: Process results (90-100%)
+      setProgress(90);
       // Safety check to prevent undefined errors
       if (results && typeof results === "object") {
         setAtsResults(results);
@@ -147,6 +157,7 @@ const ATSChecker = () => {
       } else {
         throw new Error("Invalid response format from ATS API");
       }
+      setProgress(100);
     } catch (err) {
       console.error("ATS Check Error:", err);
       let errorMessage = "Failed to analyze resume. Please try again.";
@@ -165,8 +176,10 @@ const ATSChecker = () => {
       setError(errorMessage);
       setAtsResults(null);
       setAtsScore(null);
+      setProgress(0);
     } finally {
       setIsAnalyzing(false);
+      setTimeout(() => setProgress(0), 500);
     }
   };
 
@@ -388,6 +401,48 @@ const ATSChecker = () => {
             disabled={!uploadedFile || isAnalyzing}>
             {isAnalyzing ? "Analyzing..." : "Scan for ATS"}
           </button>
+
+          {/* Progress Bar */}
+          {isAnalyzing && (
+            <div style={{ marginTop: 16, width: "100%" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                  fontSize: 14,
+                  color: "#64748b",
+                }}>
+                <span>
+                  {progress < 40
+                    ? "Parsing resume..."
+                    : progress < 80
+                    ? "Analyzing content..."
+                    : "Processing results..."}
+                </span>
+                <span>{progress}%</span>
+              </div>
+              <div
+                style={{
+                  width: "100%",
+                  height: 8,
+                  backgroundColor: "#e5e7eb",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                }}>
+                <div
+                  style={{
+                    width: `${progress}%`,
+                    height: "100%",
+                    backgroundColor: "#2563eb",
+                    borderRadius: 4,
+                    transition: "width 0.3s ease",
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

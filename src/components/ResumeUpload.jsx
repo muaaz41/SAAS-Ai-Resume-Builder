@@ -276,6 +276,20 @@ setImporting(true);
 setError("");
 
 try {
+// Check resume limit before importing
+try {
+  const resumeCountRes = await api.get("/api/v1/resumes");
+  const resumeCount = resumeCountRes.data?.data?.items?.length || resumeCountRes.data?.data?.count || 0;
+  if (resumeCount >= 5) {
+    setError("You have reached the maximum limit of 5 resumes. Please delete a resume to import a new one.");
+    setImporting(false);
+    return;
+  }
+} catch (err) {
+  console.warn("Could not check resume count:", err);
+  // Continue anyway - backend will enforce the limit
+}
+
 const formData = new FormData();
 formData.append("file", file);
 
@@ -304,10 +318,8 @@ replace: true,
 }, 100);
 }
 } catch (err) {
-setError(
-err.response?.data?.message ||
-"Failed to import resume. Please try again."
-);
+const errorMsg = err.response?.data?.message || "Failed to import resume. Please try again.";
+setError(errorMsg);
 console.error("❌ Import error:", err);
 console.error("Response:", err.response?.data);
 setImporting(false);

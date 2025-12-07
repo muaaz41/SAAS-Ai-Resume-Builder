@@ -120,7 +120,7 @@ const formatTemplateName = (template) => {
 // Builder Component
 // ------------------------------
 export default function Builder() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const navigationState = location.state || {};
@@ -604,14 +604,45 @@ export default function Builder() {
             /* ignore bad local data */
           }
 
+          // Check for pending resume data from signup flow
+          let pendingResumeData = null;
+          try {
+            const pendingDataStr = sessionStorage.getItem("pendingResumeData");
+            if (pendingDataStr) {
+              pendingResumeData = JSON.parse(pendingDataStr);
+              sessionStorage.removeItem("pendingResumeData");
+            }
+          } catch (e) {
+            console.warn("Failed to parse pending resume data:", e);
+          }
+          
           const serverTemplateSlug =
             resumeRes?.data?.data?.templateSlug ||
             merged.template?.slug ||
             merged.templateSlug;
           const slugFromLocation = location.state?.templateSlug;
+          const pendingTemplateSlug = sessionStorage.getItem("pendingTemplateSlug");
+          if (pendingTemplateSlug) {
+            sessionStorage.removeItem("pendingTemplateSlug");
+          }
           const slugFromResume = merged.templateSlug || serverTemplateSlug;
           const finalSlug =
-            slugFromResume || slugFromLocation || sortedTemplates[0]?.slug || "modern-slate";
+            slugFromResume || slugFromLocation || pendingTemplateSlug || sortedTemplates[0]?.slug || "modern-slate";
+          
+          // Merge pending resume data if available
+          if (pendingResumeData) {
+            merged = {
+              ...merged,
+              ...pendingResumeData,
+              contact: { ...merged.contact, ...pendingResumeData.contact },
+              experience: pendingResumeData.experience || merged.experience,
+              education: pendingResumeData.education || merged.education,
+              skills: pendingResumeData.skills || merged.skills,
+              projects: pendingResumeData.projects || merged.projects,
+              hobbies: pendingResumeData.hobbies || merged.hobbies,
+              awards: pendingResumeData.awards || merged.awards,
+            };
+          }
           const finalT =
             sortedTemplates.find((x) => x.slug === finalSlug) || null;
           const fallbackTemplate =
@@ -724,6 +755,19 @@ export default function Builder() {
           // Only auto-create a resume for non-fresh flows (e.g., coming from dashboard/import)
           setTimeout(async () => {
             try {
+              // Check resume limit before auto-creating
+              try {
+                const resumeCountRes = await api.get("/api/v1/resumes");
+                const resumeCount = resumeCountRes.data?.data?.items?.length || resumeCountRes.data?.data?.count || 0;
+                if (resumeCount >= 5) {
+                  console.warn("Resume limit reached, skipping auto-create");
+                  return;
+                }
+              } catch (err) {
+                console.warn("Could not check resume count:", err);
+                // Continue anyway - backend will enforce the limit
+              }
+              
               const payload = cleanResumeData({
                 title: "My Resume",
                 templateSlug: finalTemplateSlug,
@@ -741,7 +785,11 @@ export default function Builder() {
                 setTimeout(() => fetchServerPreview(), 100);
               }
             } catch (err) {
-              console.warn("Failed to create resume for template preview:", err);
+              if (err.response?.status === 400 && err.response?.data?.message?.includes("limit")) {
+                showToast(err.response.data.message, { type: "error", duration: 5000 });
+              } else {
+                console.warn("Failed to create resume for template preview:", err);
+              }
             }
           }, 50);
         }
@@ -754,6 +802,7 @@ export default function Builder() {
       alive = false;
     };
   }, [location.state]);
+
 
   // ---------- save resume (rate-limited, non-blocking) ----------
   const upsertResume = async () => {
@@ -785,6 +834,24 @@ export default function Builder() {
     try {
       let id = resumeId;
       if (!id) {
+        // Check resume limit before creating
+        try {
+          const resumeCountRes = await api.get("/api/v1/resumes");
+          const resumeCount = resumeCountRes.data?.data?.items?.length || resumeCountRes.data?.data?.count || 0;
+          if (resumeCount >= 5) {
+            showToast("You have reached the maximum limit of 5 resumes. Please delete a resume to create a new one.", {
+              type: "error",
+              duration: 5000,
+            });
+            setSaving(false);
+            saveInFlightRef.current = false;
+            return;
+          }
+        } catch (err) {
+          console.warn("Could not check resume count:", err);
+          // Continue anyway - backend will enforce the limit
+        }
+        
         const res = await api.post("/api/v1/resumes", {
           title: resume.title,
           templateSlug: resume.templateSlug,
@@ -1106,6 +1173,44 @@ export default function Builder() {
 
   // ---------- Export ----------
   const handleExport = async (format) => {
+    // Check if user is logged in
+    if (!token || !user) {
+      // Save current resume data to sessionStorage before redirecting
+      try {
+        const resumeDataToSave = {
+          title: resume.title,
+          templateSlug: resume.templateSlug || selectedTemplate?.slug,
+          contact: resume.contact,
+          experience: resume.experience,
+          education: resume.education,
+          skills: resume.skills,
+          projects: resume.projects,
+          hobbies: resume.hobbies,
+          awards: resume.awards,
+        };
+        sessionStorage.setItem("pendingResumeData", JSON.stringify(resumeDataToSave));
+        sessionStorage.setItem("pendingFlow", "builder");
+        if (resume.templateSlug || selectedTemplate?.slug) {
+          sessionStorage.setItem("pendingTemplateSlug", resume.templateSlug || selectedTemplate?.slug);
+        }
+      } catch (e) {
+        console.warn("Failed to save resume data:", e);
+      }
+      
+      const shouldSignup = window.confirm(
+        "You need to sign up to download your resume.\n\nYour progress will be saved. Would you like to sign up now?"
+      );
+      if (shouldSignup) {
+        navigate("/signup", {
+          state: {
+            redirectTo: "/builder",
+            templateSlug: resume.templateSlug || selectedTemplate?.slug,
+          },
+        });
+      }
+      return;
+    }
+    
     if (!resumeId) {
       alert("Please save your resume first");
       return;
@@ -1381,10 +1486,42 @@ export default function Builder() {
         const errorMessage =
           err?.response?.data?.message ||
           "Upgrade required to download resumes";
+        
+        // Save current resume data before redirecting to pricing
+        try {
+          if (resumeId) {
+            await upsertResume(); // Save current progress
+          } else {
+            // If resume not saved yet, save to sessionStorage
+            const resumeDataToSave = {
+              title: resume.title,
+              templateSlug: resume.templateSlug || selectedTemplate?.slug,
+              contact: resume.contact,
+              experience: resume.experience,
+              education: resume.education,
+              skills: resume.skills,
+              projects: resume.projects,
+              hobbies: resume.hobbies,
+              awards: resume.awards,
+            };
+            sessionStorage.setItem("pendingResumeData", JSON.stringify(resumeDataToSave));
+            if (resume.templateSlug || selectedTemplate?.slug) {
+              sessionStorage.setItem("pendingTemplateSlug", resume.templateSlug || selectedTemplate?.slug);
+            }
+            sessionStorage.setItem("pendingResumeId", resumeId || "");
+          }
+        } catch (e) {
+          console.warn("Failed to save resume before upgrade:", e);
+        }
+        
         const shouldUpgrade = window.confirm(
-          `${errorMessage}\n\nUpgrade to Professional or Premium plan to download your resume in PDF, DOCX, or TXT format.\n\nWould you like to upgrade now?`
+          `${errorMessage}\n\nUpgrade to Professional or Premium plan to download your resume in PDF, DOCX, or TXT format.\n\nYour progress will be saved. Would you like to upgrade now?`
         );
         if (shouldUpgrade) {
+          // Store resume ID in localStorage for post-upgrade redirect
+          if (resumeId) {
+            localStorage.setItem("postUpgradeResumeId", resumeId);
+          }
           navigate("/pricing");
         }
         setExporting(false);
@@ -1836,7 +1973,7 @@ export default function Builder() {
 
   return (
     <div style={S.page}>
-      {(isInitializing || saving || exporting) && (
+      {(isInitializing || exporting) && (
         <div
           style={{
             position: "fixed",
@@ -1870,9 +2007,7 @@ export default function Builder() {
             <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>
               {isInitializing
                 ? "Preparing your builder..."
-                : exporting
-                ? "Exporting resume..."
-                : "Saving changes..."}
+                : "Exporting resume..."}
             </div>
             <div style={{ fontSize: 13, color: "#64748b" }}>
               This usually takes just a moment.
@@ -3226,14 +3361,30 @@ export default function Builder() {
           </>
         )}
 
-        {/* Autosave status */}
-        <div style={{ ...S.small, marginTop: 16 }}>
-          {saving
-            ? "Saving…"
-            : resumeId
-            ? `Auto-saved ${resumeId ? "• Resume #" + resumeId : ""}`
-            : "Creating resume…"}
-        </div>
+        {/* Resume Title */}
+        {resumeId && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 12,
+              padding: "12px",
+              background: "#f8fafc",
+              borderRadius: 10,
+              border: "1px solid #e5e7eb",
+            }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>
+                Resume Title
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
+                {resume.title || "Untitled Resume"}
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* Navigation buttons */}
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
@@ -3301,8 +3452,40 @@ export default function Builder() {
           </div>
         </div>
         <div style={S.card}>
-          {/* Always prioritize server preview for real-time accuracy */}
-          {serverPreviewUrl ? (
+          {/* Show loader during initialization or when waiting for server preview */}
+          {isInitializing || (resumeId && !serverPreviewUrl && !serverPreview) ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                minHeight: "600px",
+                padding: "40px",
+              }}>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: "999px",
+                  border: "4px solid #e5e7eb",
+                  borderTopColor: "#2563eb",
+                  marginBottom: 16,
+                  animation: "spin 0.9s linear infinite",
+                }}
+              />
+              <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 8, color: "#0f172a" }}>
+                {isInitializing ? "Preparing your resume..." : "Loading preview..."}
+              </div>
+              <div style={{ fontSize: 14, color: "#64748b" }}>
+                This usually takes just a moment.
+              </div>
+              <style>
+                {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
+              </style>
+            </div>
+          ) : serverPreviewUrl ? (
             <iframe title="preview" src={serverPreviewUrl} style={S.iframe} />
           ) : serverPreview ? (
             <iframe title="preview" srcDoc={serverPreview} style={S.iframe} />
@@ -3679,6 +3862,7 @@ function CompletionModal({
           </button>
         </div>
       </div>
+
     </div>
   );
 }

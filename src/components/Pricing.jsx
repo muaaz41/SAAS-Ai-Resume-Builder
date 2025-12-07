@@ -96,6 +96,18 @@ const Pricing = () => {
                 `Subscription activated! You now have ${status.plan} plan access.`,
                 { type: "success", duration: 5000 }
               );
+              
+              // Check if user was redirected from builder and restore their resume
+              const postUpgradeResumeId = localStorage.getItem("postUpgradeResumeId");
+              if (postUpgradeResumeId) {
+                localStorage.removeItem("postUpgradeResumeId");
+                setTimeout(() => {
+                  navigate("/builder", {
+                    state: { resumeId: postUpgradeResumeId },
+                  });
+                }, 1500);
+                return;
+              }
             } else if (attempt < 5) {
               // Retry after delay if not active yet
               setTimeout(() => syncSubscription(attempt + 1), 2000);
@@ -221,7 +233,7 @@ const Pricing = () => {
         } catch {}
         setPendingPlanSelection(planType);
         showToast("Redirecting to payment...", {
-          type: "info",
+          type: "success",
           duration: 1000,
         });
         // Small delay to show message before redirect
@@ -272,7 +284,7 @@ const Pricing = () => {
     setLoading(true);
     setLoadingAction("update");
     showToast("Updating your subscription...", {
-      type: "info",
+      type: "success",
       duration: 3000,
     });
 
@@ -757,7 +769,16 @@ const Pricing = () => {
             )}
             <button
               className="btn-primary full"
-              onClick={() => handleCheckout("premium")}
+              onClick={() => {
+                if (
+                  subscriptionStatus?.hasActiveSubscription &&
+                  subscriptionStatus?.plan !== "premium"
+                ) {
+                  handleUpdatePlan("premium");
+                } else {
+                  handleCheckout("premium");
+                }
+              }}
               disabled={
                 isLoading || isPlanActive("premium") || !isStripeConfigured
               }
@@ -774,8 +795,11 @@ const Pricing = () => {
                 : isPlanActive("premium")
                 ? "Current Plan"
                 : subscriptionStatus?.hasActiveSubscription &&
-                  subscriptionStatus?.plan !== "premium"
+                  subscriptionStatus?.plan === "professional"
                 ? "Upgrade to Premium"
+                : subscriptionStatus?.hasActiveSubscription &&
+                  subscriptionStatus?.plan !== "premium"
+                ? "Switch to Premium"
                 : !isStripeConfigured
                 ? "Not Configured"
                 : "Get Started"}
@@ -855,7 +879,16 @@ const Pricing = () => {
             )}
             <button
               className="btn-outline full"
-              onClick={() => handleCheckout("professional")}
+              onClick={() => {
+                if (
+                  subscriptionStatus?.hasActiveSubscription &&
+                  subscriptionStatus?.plan !== "professional"
+                ) {
+                  handleUpdatePlan("professional");
+                } else {
+                  handleCheckout("professional");
+                }
+              }}
               disabled={
                 isLoading || isPlanActive("professional") || !isStripeConfigured
               }
@@ -871,6 +904,9 @@ const Pricing = () => {
                 ? "Processing..."
                 : isPlanActive("professional")
                 ? "Current Plan"
+                : subscriptionStatus?.hasActiveSubscription &&
+                  subscriptionStatus?.plan === "premium"
+                ? "Downgrade to Professional"
                 : subscriptionStatus?.hasActiveSubscription &&
                   subscriptionStatus?.plan !== "professional"
                 ? "Switch to Professional"

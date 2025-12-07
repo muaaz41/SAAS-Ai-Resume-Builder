@@ -50,6 +50,8 @@ export default function Dashboard() {
   const [category, setCategory] = useState("all");
   const [deleting, setDeleting] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [uploadTemplateSlug, setUploadTemplateSlug] = useState(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -57,6 +59,7 @@ export default function Dashboard() {
   const [selectedResumePreview, setSelectedResumePreview] = useState("");
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const toastShownRef = useRef(false);
 
   useEffect(() => {
     if (!user) return;
@@ -73,12 +76,12 @@ export default function Dashboard() {
 
   // Consistent neutral palette so inputs look identical in both OS themes
   const THEME = {
-    text: "#0f172a",
-    sub: "#475569",
-    muted: "#64748b",
+        text: "#0f172a",
+        sub: "#475569",
+        muted: "#64748b",
     border: "#d0d7e3",
-    inputBg: "#ffffff",
-  };
+        inputBg: "#ffffff",
+      };
 
   const formatPlanName = (plan) =>
     plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Free";
@@ -98,15 +101,19 @@ export default function Dashboard() {
     } catch {
       return null;
     }
-  };
+      };
 
   // Check for Stripe checkout success
+  const paymentToastShown = useRef(false);
   useEffect(() => {
+    if (paymentToastShown.current) return;
+    
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get("session_id");
     const success = urlParams.get("success");
 
     if (success === "true" && sessionId) {
+      paymentToastShown.current = true;
       showToast("Payment successful! Your subscription is now active.", {
         type: "success",
         duration: 5000,
@@ -121,7 +128,8 @@ export default function Dashboard() {
           window.location.reload();
         }, 2000);
       }
-    } else if (urlParams.get("canceled") === "true") {
+    } else if (urlParams.get("canceled") === "true" && !paymentToastShown.current) {
+      paymentToastShown.current = true;
       showToast("Payment was canceled.", {
         type: "error",
         duration: 3000,
@@ -131,6 +139,7 @@ export default function Dashboard() {
   }, [user]);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         const [t, r] = await Promise.all([
@@ -141,6 +150,8 @@ export default function Dashboard() {
           ),
           api.get("/api/v1/resumes"),
         ]);
+        if (!mounted) return;
+        
         const items = t.data?.data?.items || [];
         const visibleTemplates = items.filter((tpl) => {
           const name = (tpl?.name || "").trim();
@@ -152,11 +163,28 @@ export default function Dashboard() {
           return an.localeCompare(bn);
         });
         setTemplates(sorted);
-        setResumes(r.data?.data?.items || []);
+        const resumeItems = r.data?.data?.items || [];
+        setResumes(resumeItems);
+        
+        // Show warning if approaching resume limit (only once per session)
+        const resumeCount = r.data?.data?.count || resumeItems.length;
+        if (resumeCount >= 4 && !toastShownRef.current) {
+          toastShownRef.current = true;
+          showToast(`You have ${resumeCount}/5 resumes. Consider deleting some to create new ones.`, {
+            type: "warning",
+            duration: 5000,
+          });
+        }
       } finally {
+        if (mounted) {
         setLoading(false);
+        }
       }
     })();
+    
+    return () => {
+      mounted = false;
+    };
   }, [category]);
 
   const filtered = useMemo(() => {
@@ -177,11 +205,41 @@ export default function Dashboard() {
     try {
       await api.delete(`/api/v1/resumes/${resumeId}`);
       setResumes((prev) => prev.filter((r) => (r._id || r.id) !== resumeId));
+      showToast("Resume deleted successfully", { type: "success" });
     } catch (err) {
-      alert("Failed to delete resume. Please try again.");
+      showToast("Failed to delete resume. Please try again.", { type: "error" });
       console.error(err);
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const [duplicating, setDuplicating] = useState(null);
+
+  const handleDuplicateResume = async (resumeId) => {
+    // Check resume limit before duplicating
+    if (resumes.length >= 5) {
+      showToast("You have reached the maximum limit of 5 resumes. Please delete a resume to duplicate.", {
+        type: "error",
+        duration: 5000,
+      });
+      return;
+    }
+
+    setDuplicating(resumeId);
+    try {
+      const response = await api.post(`/api/v1/resumes/${resumeId}/duplicate`);
+      const newResume = response.data?.data?.resume;
+      if (newResume) {
+        setResumes((prev) => [newResume, ...prev]);
+        showToast("Resume duplicated successfully!", { type: "success" });
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || "Failed to duplicate resume";
+      showToast(errorMsg, { type: "error" });
+      console.error(err);
+    } finally {
+      setDuplicating(null);
     }
   };
 
@@ -274,6 +332,15 @@ export default function Dashboard() {
       return;
     }
 
+    // Check resume limit before creating
+    if (resumes.length >= 5) {
+      showToast("You have reached the maximum limit of 5 resumes. Please delete a resume to create a new one.", {
+        type: "error",
+        duration: 5000,
+      });
+      return;
+    }
+
     try {
       // Create new resume with selected template
       const { data } = await api.post("/api/v1/resumes", {
@@ -317,7 +384,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative", background: "#f2f4f7", minHeight: "100vh" }}>
       <Navbar />
       {showUpload && (
         <ResumeUpload
@@ -412,68 +479,137 @@ export default function Dashboard() {
         </div>
       )}
 
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "16px" }}>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
         <style>{`#template-search::placeholder{color:${THEME.muted}}`}</style>
 
         {subscriptionStatus && (
-          <div
-            style={{
-              border: `1px solid ${THEME.border}`,
-              background: "#f8fafc",
-              borderRadius: 16,
-              padding: 20,
-              marginBottom: 20,
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
+        <div
+          style={{
+              background: subscriptionStatus.hasActiveSubscription
+                ? `linear-gradient(135deg, ${planAccent(subscriptionStatus.plan || "free")}15 0%, ${planAccent(subscriptionStatus.plan || "free")}08 100%)`
+                : "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+              border: `2px solid ${subscriptionStatus.hasActiveSubscription ? planAccent(subscriptionStatus.plan || "free") + "30" : "#e2e8f0"}`,
+              borderRadius: 20,
+              padding: 24,
+              marginBottom: 32,
+            display: "flex",
+            alignItems: "center",
+              gap: 20,
+              boxShadow: subscriptionStatus.hasActiveSubscription
+                ? `0 4px 20px ${planAccent(subscriptionStatus.plan || "free")}15`
+                : "0 2px 8px rgba(15, 23, 42, 0.08)",
+              transition: "all 0.3s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = subscriptionStatus.hasActiveSubscription
+                ? `0 8px 30px ${planAccent(subscriptionStatus.plan || "free")}20`
+                : "0 4px 12px rgba(15, 23, 42, 0.12)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = subscriptionStatus.hasActiveSubscription
+                ? `0 4px 20px ${planAccent(subscriptionStatus.plan || "free")}15`
+                : "0 2px 8px rgba(15, 23, 42, 0.08)";
             }}>
             <div
               style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                background: planAccent(subscriptionStatus.plan || "free"),
+                width: 64,
+                height: 64,
+                borderRadius: 16,
+                background: subscriptionStatus.hasActiveSubscription
+                  ? `linear-gradient(135deg, ${planAccent(subscriptionStatus.plan || "free")} 0%, ${planAccent(subscriptionStatus.plan || "free")}dd 100%)`
+                  : "linear-gradient(135deg, #64748b 0%, #475569 100%)",
                 color: "#fff",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: 700,
-                fontSize: 18,
+                fontSize: 24,
+                boxShadow: `0 4px 12px ${planAccent(subscriptionStatus.plan || "free")}40`,
               }}>
               {subscriptionStatus.plan
                 ? subscriptionStatus.plan.charAt(0).toUpperCase()
                 : "F"}
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: THEME.text }}>
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: THEME.text,
+                  marginBottom: 6,
+                }}>
                 {subscriptionStatus.hasActiveSubscription
                   ? `${formatPlanName(subscriptionStatus.plan)} Plan`
-                  : "You are on the Free plan"}
+                  : "Free Plan"}
               </div>
-              <div style={{ fontSize: 14, color: THEME.sub, marginTop: 4 }}>
-                {subscriptionStatus.hasActiveSubscription
-                  ? formatPeriodEnd(subscriptionStatus.currentPeriodEnd)
-                    ? `Renews on ${formatPeriodEnd(
-                        subscriptionStatus.currentPeriodEnd
-                      )}`
-                    : "Active subscription"
-                  : "Unlock Premium features like AI, unlimited exports, and more."}
+              <div
+                style={{
+                  fontSize: 14,
+                  color: THEME.sub,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}>
+                {subscriptionStatus.hasActiveSubscription ? (
+                  <>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: "#10b981",
+                        boxShadow: "0 0 0 2px #10b98130",
+                      }}
+                    />
+                    {formatPeriodEnd(subscriptionStatus.currentPeriodEnd)
+                      ? `Renews on ${formatPeriodEnd(
+                          subscriptionStatus.currentPeriodEnd
+                        )}`
+                      : "Active subscription"}
+                  </>
+                ) : (
+                  <>
+                    <span>✨</span>
+                    Unlock Premium features like AI, unlimited exports, and more.
+                  </>
+                )}
               </div>
             </div>
             <button
               type="button"
               onClick={() => navigate("/pricing")}
               style={{
-                background: "#2563eb",
+                background: subscriptionStatus.hasActiveSubscription
+                  ? planAccent(subscriptionStatus.plan || "free")
+                  : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
                 color: "#fff",
                 border: "none",
-                borderRadius: 10,
-                padding: "10px 20px",
+                borderRadius: 12,
+                padding: "12px 24px",
                 fontWeight: 600,
                 cursor: "pointer",
                 fontSize: 14,
+                boxShadow: subscriptionStatus.hasActiveSubscription
+                  ? `0 4px 12px ${planAccent(subscriptionStatus.plan || "free")}40`
+                  : "0 4px 12px rgba(37, 99, 235, 0.3)",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.05)";
+                e.currentTarget.style.boxShadow = subscriptionStatus.hasActiveSubscription
+                  ? `0 6px 16px ${planAccent(subscriptionStatus.plan || "free")}50`
+                  : "0 6px 16px rgba(37, 99, 235, 0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.boxShadow = subscriptionStatus.hasActiveSubscription
+                  ? `0 4px 12px ${planAccent(subscriptionStatus.plan || "free")}40`
+                  : "0 4px 12px rgba(37, 99, 235, 0.3)";
               }}>
-              {subscriptionStatus.hasActiveSubscription ? "Manage plan" : "Upgrade"}
+              {subscriptionStatus.hasActiveSubscription ? "Manage plan" : "Upgrade Now"}
             </button>
           </div>
         )}
@@ -482,61 +618,601 @@ export default function Dashboard() {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
-            margin: "8px 0 16px",
+            alignItems: "flex-start",
+            marginBottom: 32,
+            paddingBottom: 24,
+            borderBottom: "2px solid #f1f5f9",
           }}>
-          <h1 style={{ fontSize: 24, margin: 0 }}>Welcome back</h1>
+          <div>
+            <h1
+              style={{
+                fontSize: 32,
+                fontWeight: 700,
+                margin: "0 0 8px 0",
+                color: "#0f172a",
+                background: "linear-gradient(135deg, #0f172a 0%, #475569 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>
+              Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""} 👋
+            </h1>
+            <p
+              style={{
+                fontSize: 16,
+                color: "#64748b",
+                margin: 0,
+                fontWeight: 400,
+              }}>
+              Manage your resumes and create professional documents
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button
-            onClick={() => setShowUpload(true)}
+            onClick={() => {
+              if (resumes.length >= 5) {
+                showToast("You have reached the maximum limit of 5 resumes. Please delete a resume to upload a new one.", {
+                  type: "error",
+                  duration: 5000,
+                });
+                return;
+              }
+              setShowUpload(true);
+            }}
+            disabled={resumes.length >= 5}
             style={{
-              background: "#2563eb",
+                background: resumes.length >= 5
+                  ? "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)"
+                  : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
               color: "#fff",
               border: "none",
-              borderRadius: 10,
-              padding: "10px 20px",
+                borderRadius: 12,
+                padding: "12px 20px",
               fontWeight: 600,
-              cursor: "pointer",
+              cursor: resumes.length >= 5 ? "not-allowed" : "pointer",
               fontSize: 14,
               display: "flex",
               alignItems: "center",
               gap: 8,
+                boxShadow: resumes.length >= 5
+                  ? "none"
+                  : "0 4px 12px rgba(37, 99, 235, 0.3)",
+                transition: "all 0.2s ease",
+                opacity: resumes.length >= 5 ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (resumes.length < 5) {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 6px 16px rgba(37, 99, 235, 0.4)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = resumes.length >= 5
+                  ? "none"
+                  : "0 4px 12px rgba(37, 99, 235, 0.3)";
             }}>
             <span style={{ fontSize: 18 }}>📤</span>
-            Upload Resume
+            {resumes.length >= 5 ? "Limit Reached" : "Upload Resume"}
           </button>
+            <button
+              onClick={() => setShowDeleteAccountModal(true)}
+              style={{
+                background: "#fff",
+                color: "#dc2626",
+                border: "1px solid #fecaca",
+                borderRadius: 12,
+                padding: "12px 16px",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: 13,
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#fef2f2";
+                e.currentTarget.style.borderColor = "#fca5a5";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#fff";
+                e.currentTarget.style.borderColor = "#fecaca";
+              }}>
+              Delete Account
+          </button>
+          </div>
         </div>
 
-        <section style={{ marginBottom: 32 }}>
+        {/* Your Resumes Section - Moved to top */}
+        <section style={{ marginBottom: 40 }}>
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 20,
+              marginBottom: 24,
             }}>
-            <div>
+            <div style={{ flex: 1 }}>
               <h2
                 style={{
                   fontSize: 24,
                   fontWeight: 700,
+                  margin: "0 0 6px 0",
+                  color: "#0f172a",
+                }}>
+                Your Resumes {resumes.length > 0 && `(${resumes.length}/5)`}
+              </h2>
+              <p
+                style={{
+                  fontSize: 14,
+                  color: "#64748b",
                   margin: 0,
+                }}>
+                {resumes.length === 0
+                  ? "Create your first professional resume"
+                  : "Manage and edit your saved resumes"}
+              </p>
+              {resumes.length >= 4 && resumes.length < 5 && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: "10px 14px",
+                    background: "#fef3c7",
+                    border: "1px solid #fcd34d",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "#92400e",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}>
+                  <span>⚠️</span>
+                  <span>
+                    You are approaching your resume limit (5). Consider deleting old resumes.
+                </span>
+                </div>
+              )}
+              {resumes.length >= 5 && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: "10px 14px",
+                    background: "#fee2e2",
+                    border: "1px solid #fca5a5",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "#991b1b",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}>
+                  <span>🚫</span>
+                  <span>
+                    You have reached the maximum limit of 5 resumes. Delete a resume to create a new one.
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+          {resumes.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "80px 40px",
+                background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+                borderRadius: 24,
+                border: "2px dashed #cbd5e1",
+                position: "relative",
+                overflow: "hidden",
+              }}>
+              <div
+                style={{
+                  position: "absolute",
+                  top: -50,
+                  right: -50,
+                  width: 200,
+                  height: 200,
+                  background: "radial-gradient(circle, rgba(37, 99, 235, 0.1) 0%, transparent 70%)",
+                  borderRadius: "50%",
+                }}
+              />
+              <div
+                style={{
+                  fontSize: 64,
+                  marginBottom: 20,
+                  position: "relative",
+                  zIndex: 1,
+                }}>
+                📄
+              </div>
+              <h3
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: "#0f172a",
+                  marginBottom: 12,
+                  position: "relative",
+                  zIndex: 1,
+                }}>
+                No resumes yet
+              </h3>
+              <p
+                style={{
+                  fontSize: 15,
+                  color: "#64748b",
+                  marginBottom: 32,
+                  maxWidth: 400,
+                  margin: "0 auto 32px",
+                  position: "relative",
+                  zIndex: 1,
+                }}>
+                Create your first professional resume using our templates and start building your career
+              </p>
+              <button
+                onClick={() => {
+                  if (resumes.length >= 5) {
+                    showToast("You have reached the maximum limit of 5 resumes. Please delete a resume to create a new one.", {
+                      type: "error",
+                      duration: 5000,
+                    });
+                    return;
+                  }
+                  if (templates.length > 0) {
+                    handleSelectTemplate(templates[0]);
+                  }
+                }}
+                disabled={resumes.length >= 5}
+                style={{
+                  padding: "14px 32px",
+                  background: resumes.length >= 5
+                    ? "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)"
+                    : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 12,
+                  fontWeight: 600,
+                  cursor: resumes.length >= 5 ? "not-allowed" : "pointer",
+                  fontSize: 15,
+                  boxShadow: resumes.length >= 5
+                    ? "none"
+                    : "0 4px 16px rgba(37, 99, 235, 0.3)",
+                  transition: "all 0.2s ease",
+                  position: "relative",
+                  zIndex: 1,
+                  opacity: resumes.length >= 5 ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (resumes.length < 5) {
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 6px 20px rgba(37, 99, 235, 0.4)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = resumes.length >= 5
+                    ? "none"
+                    : "0 4px 16px rgba(37, 99, 235, 0.3)";
+                }}>
+                {resumes.length >= 5 ? "🚫 Limit Reached (5/5)" : "✨ Create Your First Resume"}
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: 24,
+                marginBottom: 32,
+              }}>
+              {resumes.map((r, idx) => {
+                const template = templates.find(
+                  (t) => t.slug === r.templateSlug
+                );
+                // Use templateName from resume if available (from duplicate/create), otherwise find from templates array
+                const templateName =
+                  r.templateName || template?.name || r.templateSlug || "Unknown";
+                const templateColor = template?.ui?.accentColor || "#2563eb";
+                const lastUpdated = r.updatedAt
+                  ? new Date(r.updatedAt).toLocaleDateString()
+                  : "";
+                const isPremium = template?.category === "premium";
+
+                return (
+                  <div
+                    key={r._id || r.id || idx}
+                    style={{
+                      border: `2px solid ${templateColor}15`,
+                      borderRadius: 20,
+                      background: "#fff",
+                      overflow: "hidden",
+                      transition: "all 0.3s ease",
+                      cursor: "pointer",
+                      boxShadow: "0 2px 8px rgba(15, 23, 42, 0.08)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-6px)";
+                      e.currentTarget.style.boxShadow = `0 16px 32px ${templateColor}25`;
+                      e.currentTarget.style.borderColor = `${templateColor}30`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 2px 8px rgba(15, 23, 42, 0.08)";
+                      e.currentTarget.style.borderColor = `${templateColor}15`;
+                    }}>
+                    {/* Template Preview Header */}
+                    <div
+                      style={{
+                        height: "6px",
+                        background: `linear-gradient(90deg, ${templateColor} 0%, ${templateColor}dd 50%, ${templateColor}80 100%)`,
+                      }}
+                    />
+
+                    <div style={{ padding: 24 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          marginBottom: 16,
+                        }}>
+                        <div
+                          style={{
+                            width: 48,
+                            height: 48,
+                            background: `linear-gradient(135deg, ${templateColor}15 0%, ${templateColor}08 100%)`,
+                            borderRadius: 12,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 20,
+                            border: `1px solid ${templateColor}20`,
+                          }}>
+                          📄
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              fontSize: 18,
+                              color: "#0f172a",
+                              marginBottom: 4,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}>
+                            {r.title || "Untitled Resume"}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              color: "#64748b",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}>
+                            <span>{templateName}</span>
+                            {isPremium && (
+                              <span
+                                style={{
+                                  background: "#fbbf24",
+                                  color: "#fff",
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                }}>
+                                PREMIUM
+                </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {lastUpdated && (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "#94a3b8",
+                            marginBottom: 16,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "8px 12px",
+                            background: "#f8fafc",
+                            borderRadius: 8,
+                          }}>
+                          <span>🕒</span>
+                          <span>Last updated: {lastUpdated}</span>
+                        </div>
+                      )}
+
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          onClick={() =>
+                            navigate("/builder", {
+                              state: { resumeId: r._id || r.id },
+                            })
+                          }
+                          style={{
+                            flex: "1 1 auto",
+                            minWidth: "100px",
+                            padding: "10px 16px",
+                            borderRadius: 10,
+                            background: `linear-gradient(135deg, ${templateColor} 0%, ${templateColor}dd 100%)`,
+                            color: "white",
+                            border: "none",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontSize: 13,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: `0 2px 8px ${templateColor}30`,
+                            transition: "all 0.2s ease",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = "translateY(-1px)";
+                            e.currentTarget.style.boxShadow = `0 4px 12px ${templateColor}40`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = `0 2px 8px ${templateColor}30`;
+                          }}>
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => {
+                            handlePreviewResume(r._id || r.id);
+                          }}
+                          style={{
+                            flex: "1 1 auto",
+                            minWidth: "100px",
+                            padding: "10px 16px",
+                            borderRadius: 10,
+                            background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                            color: "white",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 2px 8px rgba(5, 150, 105, 0.3)",
+                            transition: "all 0.2s ease",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = "translateY(-1px)";
+                            e.currentTarget.style.boxShadow = "0 4px 12px rgba(5, 150, 105, 0.4)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = "0 2px 8px rgba(5, 150, 105, 0.3)";
+                          }}>
+                          Preview
+                        </button>
+                        <button
+                          onClick={() => handleDuplicateResume(r._id || r.id)}
+                          disabled={duplicating === (r._id || r.id) || resumes.length >= 5}
+                          style={{
+                            flex: "1 1 auto",
+                            minWidth: "100px",
+                            padding: "10px 16px",
+                            borderRadius: 10,
+                            background: resumes.length >= 5 ? "#f1f5f9" : "#fff",
+                            color: resumes.length >= 5 ? "#94a3b8" : "#2563eb",
+                            border: `1.5px solid ${resumes.length >= 5 ? "#cbd5e1" : "#93c5fd"}`,
+                            cursor:
+                              duplicating === (r._id || r.id) || resumes.length >= 5
+                                ? "not-allowed"
+                                : "pointer",
+                            opacity: duplicating === (r._id || r.id) || resumes.length >= 5 ? 0.6 : 1,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.2s ease",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (duplicating !== (r._id || r.id) && resumes.length < 5) {
+                              e.currentTarget.style.background = "#eff6ff";
+                              e.currentTarget.style.borderColor = "#60a5fa";
+                              e.currentTarget.style.transform = "translateY(-1px)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = resumes.length >= 5 ? "#f1f5f9" : "#fff";
+                            e.currentTarget.style.borderColor = resumes.length >= 5 ? "#cbd5e1" : "#93c5fd";
+                            e.currentTarget.style.transform = "translateY(0)";
+                          }}
+                          title={resumes.length >= 5 ? "Resume limit reached (5/5)" : "Duplicate Resume"}>
+                          {duplicating === (r._id || r.id) ? "Duplicating..." : "Duplicate"}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteResume(r._id || r.id)}
+                          disabled={deleting === (r._id || r.id)}
+                          style={{
+                            flex: "1 1 auto",
+                            minWidth: "100px",
+                            padding: "10px 16px",
+                            borderRadius: 10,
+                            background: "#fff",
+                            color: "#dc2626",
+                            border: "1.5px solid #fca5a5",
+                            cursor:
+                              deleting === (r._id || r.id)
+                                ? "not-allowed"
+                                : "pointer",
+                            opacity: deleting === (r._id || r.id) ? 0.6 : 1,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.2s ease",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (deleting !== (r._id || r.id)) {
+                              e.currentTarget.style.background = "#fef2f2";
+                              e.currentTarget.style.borderColor = "#f87171";
+                              e.currentTarget.style.transform = "translateY(-1px)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "#fff";
+                            e.currentTarget.style.borderColor = "#fca5a5";
+                            e.currentTarget.style.transform = "translateY(0)";
+                          }}>
+                          {deleting === (r._id || r.id) ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Professional Templates Section - Moved below resumes */}
+        <section style={{ marginBottom: 40 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              marginBottom: 24,
+              paddingBottom: 24,
+              borderBottom: "2px solid #f1f5f9",
+            }}>
+            <div>
+              <h2
+                style={{
+                  fontSize: 28,
+                  fontWeight: 700,
+                  margin: "0 0 8px 0",
                   color: THEME.text,
                 }}>
                 Professional Templates
               </h2>
               <p
                 style={{
-                  fontSize: 14,
+                  fontSize: 15,
                   color: THEME.sub,
-                  margin: "4px 0 0",
+                  margin: "0 0 4px 0",
                 }}>
-                Choose from {templates.length} professionally designed resume
-                templates
-                <br />
-                <span style={{ fontSize: 12, color: THEME.muted }}>
-                  Each template has a unique layout optimized for different
-                  industries
-                </span>
+                Choose from {templates.length} professionally designed resume templates
+              </p>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: THEME.muted,
+                  margin: 0,
+                }}>
+                Each template has a unique layout optimized for different industries
               </p>
             </div>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -654,7 +1330,7 @@ export default function Dashboard() {
                   style={{ fontSize: 14, fontWeight: 600, color: "#0369a1" }}>
                   {templates.filter((t) => t.category === "industry").length}{" "}
                   Industry
-                </div>
+          </div>
                 <div style={{ fontSize: 12, color: "#64748b" }}>
                   Role / sector specific
                 </div>
@@ -739,15 +1415,22 @@ export default function Dashboard() {
 
                 const handleSelect = locked
                   ? () => navigate("/pricing")
+                  : resumes.length >= 5
+                  ? () => {
+                      showToast("You have reached the maximum limit of 5 resumes. Please delete a resume to create a new one.", {
+                        type: "error",
+                        duration: 5000,
+                      });
+                    }
                   : handleSelectTemplate;
                 const handlePreview = locked
                   ? () => navigate("/pricing")
                   : handlePreviewTemplate;
 
                 return (
-                  <TemplateCard
-                    key={t.slug}
-                    template={t}
+                <TemplateCard
+                  key={t.slug}
+                  template={t}
                     isPremium={isPaid}
                     locked={locked}
                     onSelect={handleSelect}
@@ -760,12 +1443,12 @@ export default function Dashboard() {
         </section>
 
         {/* Quick Actions */}
-        <section style={{ marginBottom: 32 }}>
+        <section style={{ marginBottom: 40 }}>
           <h2
             style={{
-              fontSize: 20,
-              fontWeight: 600,
-              marginBottom: 16,
+              fontSize: 24,
+              fontWeight: 700,
+              marginBottom: 20,
               color: "#0f172a",
             }}>
             Quick Actions
@@ -778,18 +1461,32 @@ export default function Dashboard() {
             }}>
             <div
               style={{
-                background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
-                border: "1px solid #bae6fd",
+                background: resumes.length >= 5
+                  ? "linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)"
+                  : "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
+                border: `1px solid ${resumes.length >= 5 ? "#cbd5e1" : "#bae6fd"}`,
                 borderRadius: 12,
                 padding: 20,
-                cursor: "pointer",
+                cursor: resumes.length >= 5 ? "not-allowed" : "pointer",
                 transition: "all 0.2s",
+                opacity: resumes.length >= 5 ? 0.6 : 1,
               }}
-              onClick={() => setShowUpload(true)}
+              onClick={() => {
+                if (resumes.length >= 5) {
+                  showToast("You have reached the maximum limit of 5 resumes. Please delete a resume to upload a new one.", {
+                    type: "error",
+                    duration: 5000,
+                  });
+                  return;
+                }
+                setShowUpload(true);
+              }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow =
-                  "0 8px 25px rgba(14, 165, 233, 0.15)";
+                if (resumes.length < 5) {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 8px 25px rgba(14, 165, 233, 0.15)";
+                }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
@@ -801,33 +1498,47 @@ export default function Dashboard() {
                   fontSize: 16,
                   fontWeight: 600,
                   margin: "0 0 4px",
-                  color: "#0c4a6e",
+                  color: resumes.length >= 5 ? "#64748b" : "#0c4a6e",
                 }}>
                 Upload Resume
               </h3>
-              <p style={{ fontSize: 13, color: "#0369a1", margin: 0 }}>
-                Import your existing resume and let AI extract all information
+              <p style={{ fontSize: 13, color: resumes.length >= 5 ? "#94a3b8" : "#0369a1", margin: 0 }}>
+                {resumes.length >= 5
+                  ? "Resume limit reached (5/5)"
+                  : "Import your existing resume and let AI extract all information"}
               </p>
             </div>
 
             <div
               style={{
-                background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
-                border: "1px solid #bbf7d0",
+                background: resumes.length >= 5
+                  ? "linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)"
+                  : "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+                border: `1px solid ${resumes.length >= 5 ? "#cbd5e1" : "#bbf7d0"}`,
                 borderRadius: 12,
                 padding: 20,
-                cursor: "pointer",
+                cursor: resumes.length >= 5 ? "not-allowed" : "pointer",
                 transition: "all 0.2s",
+                opacity: resumes.length >= 5 ? 0.6 : 1,
               }}
               onClick={() => {
+                if (resumes.length >= 5) {
+                  showToast("You have reached the maximum limit of 5 resumes. Please delete a resume to create a new one.", {
+                    type: "error",
+                    duration: 5000,
+                  });
+                  return;
+                }
                 if (templates.length > 0) {
                   handleSelectTemplate(templates[0]);
                 }
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow =
-                  "0 8px 25px rgba(34, 197, 94, 0.15)";
+                if (resumes.length < 5) {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 8px 25px rgba(34, 197, 94, 0.15)";
+                }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
@@ -839,12 +1550,14 @@ export default function Dashboard() {
                   fontSize: 16,
                   fontWeight: 600,
                   margin: "0 0 4px",
-                  color: "#14532d",
+                  color: resumes.length >= 5 ? "#64748b" : "#14532d",
                 }}>
                 Start from Scratch
               </h3>
-              <p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
-                Create a new resume using our professional templates
+              <p style={{ fontSize: 13, color: resumes.length >= 5 ? "#94a3b8" : "#166534", margin: 0 }}>
+                {resumes.length >= 5
+                  ? "Resume limit reached (5/5)"
+                  : "Create a new resume using our professional templates"}
               </p>
             </div>
 
@@ -889,227 +1602,6 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <section>
-          <h2
-            style={{
-              fontSize: 20,
-              fontWeight: 600,
-              marginBottom: 16,
-              color: "#0f172a",
-            }}>
-            Your Resumes
-          </h2>
-          {resumes.length === 0 ? (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "60px 20px",
-                background: "#f8fafc",
-                borderRadius: 16,
-                border: "1px solid #e2e8f0",
-              }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>📄</div>
-              <h3
-                style={{
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: "#0f172a",
-                  marginBottom: 8,
-                }}>
-                No resumes yet
-              </h3>
-              <p style={{ fontSize: 14, color: "#64748b", marginBottom: 20 }}>
-                Create your first professional resume using our templates
-              </p>
-              <button
-                onClick={() => {
-                  if (templates.length > 0) {
-                    handleSelectTemplate(templates[0]);
-                  }
-                }}
-                style={{
-                  padding: "12px 24px",
-                  background: "#2563eb",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 10,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontSize: 14,
-                }}>
-                Create Your First Resume
-              </button>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                gap: 20,
-              }}>
-              {resumes.map((r, idx) => {
-                const template = templates.find(
-                  (t) => t.slug === r.templateSlug
-                );
-                const templateName =
-                  template?.name || r.templateSlug || "Unknown";
-                const templateColor = template?.ui?.accentColor || "#2563eb";
-                const lastUpdated = r.updatedAt
-                  ? new Date(r.updatedAt).toLocaleDateString()
-                  : "";
-                const isPremium = template?.category === "premium";
-
-                return (
-                  <div
-                    key={r._id || r.id || idx}
-                    style={{
-                      border: `2px solid ${templateColor}20`,
-                      borderRadius: 16,
-                      background: "#fff",
-                      overflow: "hidden",
-                      transition: "all 0.3s ease",
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-4px)";
-                      e.currentTarget.style.boxShadow = `0 12px 24px ${templateColor}20`;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "none";
-                    }}>
-                    {/* Template Preview Header */}
-                    <div
-                      style={{
-                        height: "8px",
-                        background: `linear-gradient(90deg, ${templateColor}, ${templateColor}80)`,
-                      }}
-                    />
-
-                    <div style={{ padding: 20 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 12,
-                        }}>
-                        <div
-                          style={{
-                            width: 40,
-                            height: 40,
-                            background: `${templateColor}15`,
-                            borderRadius: 10,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 18,
-                          }}>
-                          📄
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              fontWeight: 600,
-                              fontSize: 16,
-                              color: "#0f172a",
-                            }}>
-                            {r.title || "Untitled Resume"}
-                          </div>
-                          <div style={{ fontSize: 12, color: "#64748b" }}>
-                            {templateName} {isPremium && "⭐"}
-                          </div>
-                        </div>
-                      </div>
-
-                      {lastUpdated && (
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "#94a3b8",
-                            marginBottom: 16,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}>
-                          <span>🕒</span>
-                          Last updated: {lastUpdated}
-                        </div>
-                      )}
-
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          onClick={() =>
-                            navigate("/builder", {
-                              state: { resumeId: r._id || r.id },
-                            })
-                          }
-                          style={{
-                            flex: 1,
-                            padding: "10px 16px",
-                            borderRadius: 10,
-                            background: templateColor,
-                            color: "white",
-                            border: "none",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            fontSize: 14,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 6,
-                          }}>
-                          <span>✏️</span>
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => {
-                            console.log(
-                              "👁️ Eye button clicked for resume:",
-                              r._id || r.id
-                            );
-                            handlePreviewResume(r._id || r.id);
-                          }}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: 10,
-                            background: "#059669",
-                            color: "white",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: 14,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}>
-                          👁️
-                        </button>
-                        <button
-                          onClick={() => handleDeleteResume(r._id || r.id)}
-                          disabled={deleting === (r._id || r.id)}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: 10,
-                            background: "#fff",
-                            color: "#dc2626",
-                            border: "1px solid #fca5a5",
-                            cursor:
-                              deleting === (r._id || r.id)
-                                ? "not-allowed"
-                                : "pointer",
-                            opacity: deleting === (r._id || r.id) ? 0.6 : 1,
-                            fontSize: 14,
-                          }}>
-                          {deleting === (r._id || r.id) ? "⏳" : "🗑️"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
       </main>
       <Footer />
 
@@ -1127,6 +1619,130 @@ export default function Dashboard() {
           }}
           onSelect={handleSelectTemplate}
         />
+      )}
+
+      {/* Account Deletion Confirmation Modal */}
+      {showDeleteAccountModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 80,
+          }}>
+          <div
+            style={{
+              background: "#ffffff",
+              padding: 24,
+              borderRadius: 16,
+              boxShadow: "0 22px 55px rgba(15,23,42,0.45)",
+              maxWidth: 480,
+              width: "90%",
+            }}>
+            <h2
+              style={{
+                margin: "0 0 8px",
+                fontSize: 20,
+                fontWeight: 700,
+                color: "#0f172a",
+              }}>
+              Delete your account?
+            </h2>
+            <p
+              style={{
+                margin: "0 0 8px",
+                fontSize: 14,
+                color: "#475569",
+                lineHeight: 1.5,
+              }}>
+              This will immediately sign you out and mark your account for deletion. Your account
+              and all associated data (resumes, templates, billing info) will no longer be
+              accessible in the app.
+            </p>
+            <p
+              style={{
+                margin: "0 0 16px",
+                fontSize: 13,
+                color: "#b91c1c",
+                lineHeight: 1.5,
+              }}>
+              Data may be retained securely for up to 30 days for legal and recovery purposes.
+              After that, it may be permanently removed and cannot be restored.
+            </p>
+            <p
+              style={{
+                margin: "0 0 20px",
+                fontSize: 13,
+                color: "#64748b",
+              }}>
+              If you delete by mistake, contact support within 30 days and we may be able to help
+              restore your account.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 12,
+                marginTop: 8,
+              }}>
+              <button
+                type="button"
+                onClick={() => setShowDeleteAccountModal(false)}
+                style={{
+                  padding: "9px 18px",
+                  borderRadius: 999,
+                  border: "1px solid #cbd5e1",
+                  background: "#ffffff",
+                  color: "#0f172a",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: deletingAccount ? "not-allowed" : "pointer",
+                  opacity: deletingAccount ? 0.6 : 1,
+                }}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (deletingAccount) return;
+                  setDeletingAccount(true);
+                  try {
+                    const res = await api.delete("/api/v1/auth/delete");
+                    const msg =
+                      res?.data?.message ||
+                      res?.data?.data?.message ||
+                      "Account deleted. You have up to 30 days to request restoration.";
+                    showToast(msg, { type: "success", duration: 5000 });
+                    localStorage.clear();
+                    window.location.href = "/signin";
+                  } catch (err) {
+                    console.error(err);
+                    const msg =
+                      err.response?.data?.message ||
+                      "Failed to delete account. Please try again.";
+                    showToast(msg, { type: "error" });
+                    setDeletingAccount(false);
+                  }
+                }}
+                style={{
+                  padding: "9px 20px",
+                  borderRadius: 999,
+                  border: "1px solid #fecaca",
+                  background: "#fee2e2",
+                  color: "#b91c1c",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: deletingAccount ? "not-allowed" : "pointer",
+                  opacity: deletingAccount ? 0.7 : 1,
+                }}>
+                {deletingAccount ? "Deleting..." : "Yes, delete my account"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

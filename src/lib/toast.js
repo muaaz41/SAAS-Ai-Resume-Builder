@@ -1,5 +1,6 @@
 // Minimal toast utility without external deps
 let toastRoot;
+const activeToasts = new Set();
 
 function ensureRoot() {
   if (toastRoot && document.body.contains(toastRoot)) return toastRoot;
@@ -18,6 +19,13 @@ function ensureRoot() {
 }
 
 export function showToast(message, { type = "error", duration = 4000 } = {}) {
+  // Prevent duplicate toasts with the same message
+  const toastKey = `${message}-${type}`;
+  if (activeToasts.has(toastKey)) {
+    return;
+  }
+  
+  activeToasts.add(toastKey);
   const root = ensureRoot();
   const node = document.createElement("div");
   node.textContent = message;
@@ -44,6 +52,7 @@ export function showToast(message, { type = "error", duration = 4000 } = {}) {
   });
 
   const remove = () => {
+    activeToasts.delete(toastKey);
     node.style.opacity = "0";
     node.style.transform = "translateY(8px)";
     setTimeout(() => {

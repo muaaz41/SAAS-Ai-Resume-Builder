@@ -16,7 +16,9 @@ const Navbar = () => {
     <header className="nav">
       <div className="nav-inner">
         <div className="nav-brand">
-          <img src={sitelogo} alt="Site logo" className="nav-logo" />
+          <Link to="/" style={{ display: "flex", alignItems: "center" }}>
+            <img src={sitelogo} alt="Site logo" className="nav-logo" />
+          </Link>
         </div>
 
         {/* Desktop Navigation */}

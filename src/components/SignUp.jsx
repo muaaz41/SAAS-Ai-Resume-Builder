@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../css/SignUp.css";
 import signUpImage from "../assets/img1.jpg";
 import googleIcon from "../assets/google.png";
 import linkedinIcon from "../assets/linkedin.png";
 import { useAuth } from "../context/AuthContext.jsx";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { showToast } from "../lib/toast";
 import {
   GoogleLogin,
@@ -22,6 +22,7 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false);
   const { signup, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -41,7 +42,30 @@ const SignUp = () => {
         type: "success",
         duration: 2500,
       });
-      navigate("/dashboard");
+      
+      // Check for pending flow redirect
+      const pendingFlow = sessionStorage.getItem("pendingFlow");
+      const pendingTemplateSlug = sessionStorage.getItem("pendingTemplateSlug");
+      const redirectTo = location.state?.redirectTo;
+      const templateSlug = location.state?.templateSlug || pendingTemplateSlug;
+      
+      // Clear session storage
+      sessionStorage.removeItem("pendingFlow");
+      sessionStorage.removeItem("pendingTemplateSlug");
+      
+      // If there's a redirect path, go there after verification
+      if (redirectTo && templateSlug) {
+        sessionStorage.setItem("postVerificationRedirect", redirectTo);
+        sessionStorage.setItem("postVerificationTemplateSlug", templateSlug);
+      } else if (pendingFlow === "builder" && pendingTemplateSlug) {
+        sessionStorage.setItem("postVerificationRedirect", "/builder");
+        sessionStorage.setItem("postVerificationTemplateSlug", pendingTemplateSlug);
+      } else if (pendingFlow === "upload") {
+        sessionStorage.setItem("postVerificationRedirect", "/dashboard");
+        sessionStorage.setItem("postVerificationAction", "upload");
+      }
+      
+      navigate("/auth/verify-email");
     } catch (err) {
       const msg =
         err?.status === 409 || /already/i.test(err?.message || "")
@@ -122,9 +146,16 @@ const SignUp = () => {
                     import.meta.env.VITE_LINKEDIN_CLIENT_ID || "";
                   const redirectUri =
                     import.meta.env.VITE_LINKEDIN_REDIRECT_URI ||
-                    "http://localhost:5173/auth/linkedin/callback";
+                    `${window.location.origin}/auth/linkedin/callback`;
                   const state = Math.random().toString(36).slice(2);
                   sessionStorage.setItem("li_oauth_state", state);
+                  
+                  // Check if this is part of an import flow
+                  const pendingFlow = sessionStorage.getItem("pendingFlow");
+                  if (pendingFlow === "linkedin-import") {
+                    sessionStorage.setItem("li_import_flow", "true");
+                  }
+                  
                   const authorizeUrl = new URL(
                     "https://www.linkedin.com/oauth/v2/authorization"
                   );

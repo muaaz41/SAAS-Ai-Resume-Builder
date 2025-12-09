@@ -304,6 +304,31 @@ headers: { "Content-Type": "multipart/form-data" },
 
 const resumeId = res.data?.data?.resumeId;
 if (resumeId) {
+// Fetch the newly created resume so builder fields are prefilled
+try {
+  const resumeRes = await api.get(`/api/v1/resumes/${resumeId}`);
+  const resumePayload = resumeRes.data?.data?.resume;
+  if (resumePayload) {
+    sessionStorage.setItem(
+      "pendingResumeData",
+      JSON.stringify({
+        contact: resumePayload.contact || {},
+        experience: resumePayload.experience || [],
+        education: resumePayload.education || [],
+        skills: resumePayload.skills || [],
+        projects: resumePayload.projects || [],
+        awards: resumePayload.awards || [],
+        hobbies: resumePayload.hobbies || [],
+        title: resumePayload.title || "Imported Resume",
+        templateSlug: templateSlug,
+      })
+    );
+    sessionStorage.setItem("pendingTemplateSlug", templateSlug);
+  }
+} catch (fetchErr) {
+  console.warn("Could not prefetch resume for builder:", fetchErr);
+}
+
 // Close modal first
 if (onClose) onClose();
 // Small delay to ensure state is clean before navigation
@@ -312,6 +337,7 @@ navigate("/builder", {
 state: {
 resumeId,
 templateSlug: templateSlug,
+          startFresh: false,
 },
 replace: true,
 });
@@ -385,6 +411,13 @@ Remove
 <div style={S.previewCard}>
 <div style={S.previewTitle}>✨ Parsed Resume Data</div>
 
+{parsedData.contact?.summary && (
+<div style={S.previewSection}>
+  <div style={S.sectionLabel}>Summary</div>
+  <div style={S.sectionContent}>{parsedData.contact.summary}</div>
+</div>
+)}
+
 {parsedData.contact && (
 <div style={S.previewSection}>
 <div style={S.sectionLabel}>Contact Information</div>
@@ -405,6 +438,30 @@ Remove
 )}
 {parsedData.contact.address && (
 <>{parsedData.contact.address}</>
+)}
+{parsedData.contact.location && (
+  <>
+    <br />
+    {parsedData.contact.location}
+  </>
+)}
+{parsedData.contact.website && (
+  <>
+    <br />
+    {parsedData.contact.website}
+  </>
+)}
+{parsedData.contact.github && (
+  <>
+    <br />
+    {parsedData.contact.github}
+  </>
+)}
+{parsedData.contact.linkedin && (
+  <>
+    <br />
+    {parsedData.contact.linkedin}
+  </>
 )}
 </div>
 </div>
@@ -446,6 +503,14 @@ Remove
 {parsedData.education.map((edu, i) => (
 <div key={i}>
 {edu.degree || "Degree"} - {edu.school || "School"}
+{(edu.startDate || edu.endDate) && (
+  <>
+    {" "}
+    ({edu.startDate?.substring(0, 4) || "N/A"} -{" "}
+    {edu.endDate?.substring(0, 4) || "N/A"})
+  </>
+)}
+{edu.location && ` – ${edu.location}`}
 </div>
 ))}
 </div>
@@ -456,11 +521,99 @@ Remove
 <div style={S.previewSection}>
 <div style={S.sectionLabel}>Skills</div>
 <div style={S.sectionContent}>
-{parsedData.skills
-.slice(0, 10)
-.map((s) => s.name)
-.join(", ")}
-{parsedData.skills.length > 10 && " ..."}
+<div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
+  {parsedData.skills.slice(0, 20).map((skill, i) => {
+    const name = typeof skill === "string" ? skill : skill?.name || "";
+    const level =
+      typeof skill === "object" && typeof skill.level === "number"
+        ? skill.level
+        : undefined;
+    return (
+      <div key={i}>
+        {name}
+        {level !== undefined ? ` (${level})` : ""}
+      </div>
+    );
+  })}
+  {parsedData.skills.length > 20 && (
+    <div style={{ color: "#64748b", fontSize: 13 }}>
+      + {parsedData.skills.length - 20} more
+    </div>
+  )}
+</div>
+</div>
+</div>
+)}
+
+{parsedData.projects?.length > 0 && (
+<div style={S.previewSection}>
+  <div style={S.sectionLabel}>Projects</div>
+  <div style={S.sectionContent}>
+    {parsedData.projects.map((p, i) => (
+      <div key={i} style={{ marginBottom: 8 }}>
+        <strong>{p.name || "Project"}</strong>
+        {p.link && (
+          <>
+            {" – "}
+            <span style={{ color: "#2563eb" }}>{p.link}</span>
+          </>
+        )}
+        {p.description && (
+          <>
+            <br />
+            {p.description}
+          </>
+        )}
+      </div>
+    ))}
+  </div>
+</div>
+)}
+
+{parsedData.awards?.length > 0 && (
+<div style={S.previewSection}>
+  <div style={S.sectionLabel}>Awards</div>
+  <div style={S.sectionContent}>
+    {parsedData.awards.map((a, i) => (
+      <div key={i} style={{ marginBottom: 8 }}>
+        <strong>{a.title || a.name || "Award"}</strong>
+        {a.issuer && ` – ${a.issuer}`}
+        {a.date && ` (${a.date.substring(0, 10)})`}
+        {a.description && (
+          <>
+            <br />
+            {a.description}
+          </>
+        )}
+      </div>
+    ))}
+  </div>
+</div>
+)}
+
+{parsedData.hobbies?.length > 0 && (
+<div style={S.previewSection}>
+  <div style={S.sectionLabel}>Interests</div>
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+    gap: "8px 12px",
+  }}>
+  {parsedData.hobbies.map((h, i) => (
+    <div
+      key={i}
+      style={{
+        padding: "8px 10px",
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+        borderRadius: 8,
+        fontSize: 13,
+        color: "#0f172a",
+      }}>
+      {typeof h === "string" ? h : h.name || ""}
+    </div>
+  ))}
 </div>
 </div>
 )}

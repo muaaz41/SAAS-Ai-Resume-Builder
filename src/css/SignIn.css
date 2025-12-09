@@ -184,6 +184,12 @@
     background: #0056b3;
   }
   
+.signin-btn:disabled,
+.google-signin-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
   .signup-link {
     text-align: center;
     color: #666;
@@ -216,6 +222,15 @@
       padding: 32px 24px;
     }
   }
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
   
   @media (max-width: 768px) {
     .left-section {

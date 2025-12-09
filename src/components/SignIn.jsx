@@ -53,6 +53,44 @@ const SignIn = () => {
 
   return (
     <div className="signin-container">
+      {(loading || restoring) && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.25)",
+            backdropFilter: "blur(3px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2000,
+          }}>
+          <div
+            style={{
+              background: "#fff",
+              padding: "14px 18px",
+              borderRadius: 12,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              fontWeight: 600,
+              color: "#0f172a",
+            }}>
+            <div
+              style={{
+                width: 18,
+                height: 18,
+                border: "3px solid #cbd5e1",
+                borderTopColor: "#2563eb",
+                borderRadius: "50%",
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
+            Signing you in…
+          </div>
+        </div>
+      )}
       {/* Header/Navbar */}
       <div
         style={{
@@ -112,7 +150,13 @@ const SignIn = () => {
           {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
             <div
               className="google-signin-btn"
-              style={{ padding: 0, border: "none", background: "transparent" }}>
+              style={{
+                padding: 0,
+                border: "none",
+                background: "transparent",
+                pointerEvents: loading ? "none" : "auto",
+                opacity: loading ? 0.6 : 1,
+              }}>
               <GoogleLogin
                 onSuccess={async (cred) => {
                   const idToken = cred.credential;
@@ -159,7 +203,9 @@ const SignIn = () => {
             <button
               type="button"
               className="google-signin-btn"
+              disabled={loading}
               onClick={() => {
+                if (loading) return;
                 const clientId = import.meta.env.VITE_LINKEDIN_CLIENT_ID || "";
                 const redirectUri =
                   import.meta.env.VITE_LINKEDIN_REDIRECT_URI ||

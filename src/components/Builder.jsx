@@ -104,6 +104,11 @@ const cleanResumeData = (data) => {
   };
 };
 
+// Small helper to standardize inline alerts across the builder
+const showAlert = (message, type = "info", duration = 4000) => {
+  showToast(message, { type, duration });
+};
+
 const formatTemplateName = (template) => {
   if (!template) return "";
   const base = template.name?.trim() || template.slug || "";
@@ -371,35 +376,67 @@ export default function Builder() {
   const hasTemplateSelected = Boolean(resolvedTemplate?.slug);
   const isPremiumTemplate = resolvedTemplate?.category === "premium";
 
+  // Helpers to keep experience rich text + bullets in sync
+  const bulletsToHtml = (bullets = []) => {
+    const clean = (bullets || []).filter(Boolean);
+    if (!clean.length) return "";
+    return `<ul>${clean.map((b) => `<li>${b}</li>`).join("")}</ul>`;
+  };
+  const extractBulletsFromHtml = (html = "") => {
+    if (!html) return [];
+    try {
+      const div = document.createElement("div");
+      div.innerHTML = html;
+      const li = Array.from(div.querySelectorAll("li")).map((el) =>
+        el.textContent.trim()
+      );
+      if (li.length) return li.filter(Boolean);
+      const text = div.textContent || "";
+      return text
+        .split("\n")
+        .map((l) => l.trim().replace(/^[–—\-•\u2022]\s*/, ""))
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  };
+
   // ---------- styles (unchanged) ----------
   const S = {
     page: {
       display: "grid",
-      gridTemplateColumns: "minmax(720px, 860px) minmax(480px, 640px)",
-      gap: 24,
+      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+      gap: 20,
+      minHeight: "calc(100vh - 64px)",
       height: "calc(100vh - 64px)",
       background: THEME.pageBg,
-      padding: "24px 24px 32px",
+      padding: "20px 20px 20px",
+      overflow: "hidden",
     },
     left: {
       background: THEME.cardBg,
-      borderRadius: 12,
-      padding: 24,
+      borderRadius: 14,
+      padding: 28,
       border: `1px solid ${THEME.border}`,
+      boxShadow: "0 10px 30px rgba(15,23,42,0.05)",
       overflow: "auto",
+      height: "100%",
       color: THEME.text,
     },
     rightWrap: {
       background: THEME.panelBg,
-      borderRadius: 12,
+      borderRadius: 14,
       border: `1px solid ${THEME.border}`,
-      padding: 16,
+      padding: 20,
       display: "grid",
       gridTemplateRows: "48px 1fr",
       color: THEME.text,
+      boxShadow: "0 10px 30px rgba(15,23,42,0.05)",
+      height: "100%",
+      overflow: "hidden",
     },
     headerTitle: {
-      fontSize: 22,
+      fontSize: 20,
       fontWeight: 700,
       margin: 0,
       color: THEME.text,
@@ -469,12 +506,12 @@ export default function Builder() {
     stepperWrap: {
       display: "flex",
       alignItems: "center",
-      gap: 10,
+      gap: 12,
       margin: "12px 0 20px",
     },
     step: (active, done) => ({
-      width: 34,
-      height: 34,
+      width: 32,
+      height: 32,
       borderRadius: 999,
       border: "2px solid #93c5fd",
       background: active ? "#2563eb" : done ? "#1d4ed8" : "#fff",
@@ -656,31 +693,56 @@ export default function Builder() {
               : { slug: finalSlug });
           setSelectedTemplate(fallbackTemplate);
 
-          const safeExperience = merged.experience?.length
-            ? merged.experience
-            : [
-                {
-                  title: "",
-                  company: "",
-                  location: "",
-                  startDate: "",
-                  endDate: "",
-                  current: false,
-                  bullets: [],
-                },
-              ];
-          const safeEducation = merged.education?.length
-            ? merged.education
-            : [
-                {
-                  degree: "",
-                  school: "",
-                  location: "",
-                  startDate: "",
-                  endDate: "",
-                  details: [],
-                },
-              ];
+          const normalizeDate = (val) => {
+            if (!val) return "";
+            if (typeof val === "string") {
+              // Expect ISO string from API; keep only YYYY-MM-DD for <input type="date" />
+              if (val.includes("T")) return val.split("T")[0];
+              if (val.length >= 10) return val.slice(0, 10);
+              return val;
+            }
+            try {
+              const d = new Date(val);
+              if (!isNaN(d)) return d.toISOString().split("T")[0];
+            } catch {}
+            return "";
+          };
+
+          const safeExperience =
+            merged.experience?.length > 0
+              ? merged.experience.map((e) => ({
+                  ...e,
+                  startDate: normalizeDate(e.startDate),
+                  endDate: e.current ? "" : normalizeDate(e.endDate),
+                }))
+              : [
+                  {
+                    title: "",
+                    company: "",
+                    location: "",
+                    startDate: "",
+                    endDate: "",
+                    current: false,
+                    bullets: [],
+                  },
+                ];
+          const safeEducation =
+            merged.education?.length > 0
+              ? merged.education.map((e) => ({
+                  ...e,
+                  startDate: normalizeDate(e.startDate),
+                  endDate: normalizeDate(e.endDate),
+                }))
+              : [
+                  {
+                    degree: "",
+                    school: "",
+                    location: "",
+                    startDate: "",
+                    endDate: "",
+                    details: [],
+                  },
+                ];
 
           setResume((prev) => ({
             ...prev,
@@ -698,7 +760,12 @@ export default function Builder() {
                 merged.contact?.portfolioLink ||
                 prev.contact.portfolioLink ||
                 "",
-              summary: merged.contact?.summary || prev.contact.summary || "",
+              summary:
+                merged.contact?.summary ||
+                merged.contact?.professionalSummary ||
+                prev.contact.summary ||
+                prev.contact.professionalSummary ||
+                "",
               professionalSummary:
                 merged.contact?.professionalSummary ||
                 merged.contact?.summary ||
@@ -1015,8 +1082,13 @@ export default function Builder() {
     if (aiGeneratedText.trim()) {
       setResume((r) => ({
         ...r,
-        contact: { ...r.contact, summary: aiGeneratedText },
+        contact: {
+          ...r.contact,
+          summary: aiGeneratedText,
+          professionalSummary: aiGeneratedText,
+        },
       }));
+      setJobDescription("");
       setShowAiPreview(false);
       setAiGeneratedText("");
       showToast(
@@ -1028,8 +1100,9 @@ export default function Builder() {
 
   const generateExperienceBullets = async (experienceIndex = 0) => {
     if (!jobDescription.trim()) {
-      alert(
-        "Please enter a job description first to help AI generate better content"
+      showAlert(
+        "Please enter a job description first to help AI generate better content",
+        "warning"
       );
       return;
     }
@@ -1069,17 +1142,21 @@ export default function Builder() {
           exp[targetIndex] = { ...exp[targetIndex], bullets: finalBullets };
           return { ...r, experience: exp };
         });
-        alert(
-          `✅ AI generated ${finalBullets.length} bullet points! Check the Job Description field.`
+        showAlert(
+          `✅ AI generated ${finalBullets.length} bullet points! Check the Job Description field.`,
+          "success",
+          4500
         );
       } else {
-        alert("AI didn't return any bullet points. Please try again.");
+        showAlert("AI didn't return any bullet points. Please try again.", "error");
       }
     } catch (err) {
       console.error("AI Error:", err);
-      alert(
+      showAlert(
         "Failed to generate AI bullets: " +
-          (err.response?.data?.message || err.message)
+          (err.response?.data?.message || err.message),
+        "error",
+        5000
       );
     } finally {
       setAiLoading(false);
@@ -1212,7 +1289,7 @@ export default function Builder() {
     }
     
     if (!resumeId) {
-      alert("Please save your resume first");
+      showAlert("Please save your resume first", "warning");
       return;
     }
     setExporting(true);
@@ -1358,7 +1435,7 @@ export default function Builder() {
         try {
           const txt = await res.data.text();
           console.error("Unexpected content-type:", headerCT, txt);
-          alert(`Export failed: ${txt.slice(0, 300)}`);
+          showAlert(`Export failed: ${txt.slice(0, 300)}`, "error", 6000);
           setExporting(false);
           setExportingFormat(null);
           return;
@@ -1414,13 +1491,13 @@ export default function Builder() {
                   keys.length
                 );
               } else {
-                alert("Export failed: received invalid file data.");
+                showAlert("Export failed: received invalid file data.", "error");
                 setExporting(false);
                 setExportingFormat(null);
                 return;
               }
             } else {
-              alert("Export failed: received text instead of a file.");
+              showAlert("Export failed: received text instead of a file.", "error");
               setExporting(false);
               setExportingFormat(null);
               return;
@@ -1430,7 +1507,7 @@ export default function Builder() {
               "Failed to reconstruct binary from JSON:",
               reconstructErr
             );
-            alert("Export failed: invalid file format from server.");
+            showAlert("Export failed: invalid file format from server.", "error");
             setExporting(false);
             setExportingFormat(null);
             return;
@@ -1683,7 +1760,9 @@ export default function Builder() {
     const email = resume.contact?.email || "email@example.com";
     const headline = resume.contact?.headline || "Product Designer (UX/UI)";
     const summary =
-      resume.contact?.summary || "Use this block to introduce yourself.";
+      resume.contact?.summary ||
+      resume.contact?.professionalSummary ||
+      "Use this block to introduce yourself.";
     const skills =
       (resume.skills || []).map((s) => s.name || s).filter(Boolean) || [];
 
@@ -2362,8 +2441,17 @@ export default function Builder() {
         {step === 3 && (
           <>
             {resume.experience.map((exp, idx) => (
-              <div key={idx} style={{ marginBottom: 24 }}>
-                <div style={{ marginBottom: 12 }}>
+              <div
+                key={idx}
+                style={{
+                  marginBottom: 20,
+                  padding: 16,
+                  borderRadius: 12,
+                  border: `1px solid ${THEME.border}`,
+                  background: THEME.panelBg,
+                  boxShadow: "0 8px 24px rgba(15,23,42,0.04)",
+                }}>
+                <div style={{ marginBottom: 14 }}>
                   <label style={S.label}>Job Title *</label>
                   <input
                     placeholder="Senior Product Designer"
@@ -2377,7 +2465,7 @@ export default function Builder() {
                     }}
                   />
                 </div>
-                <div style={{ marginBottom: 12 }}>
+                <div style={{ marginBottom: 14 }}>
                   <label style={S.label}>Company *</label>
                   <input
                     placeholder="TechCorp Inc"
@@ -2391,7 +2479,7 @@ export default function Builder() {
                     }}
                   />
                 </div>
-                <div style={{ marginBottom: 12 }}>
+                <div style={{ marginBottom: 14 }}>
                   <label style={S.label}>Location</label>
                   <input
                     placeholder="New York, NY"
@@ -2405,7 +2493,7 @@ export default function Builder() {
                     }}
                   />
                 </div>
-                <div style={{ ...S.grid2, marginBottom: 12 }}>
+                <div style={{ ...S.grid2, marginBottom: 14 }}>
                   <div>
                     <label style={S.label}>
                       📅 Start Date *{" "}
@@ -2456,7 +2544,7 @@ export default function Builder() {
                     />
                   </div>
                 </div>
-                <div style={{ marginBottom: 12 }}>
+                <div style={{ marginBottom: 14 }}>
                   <label
                     style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <input
@@ -2473,25 +2561,28 @@ export default function Builder() {
                     <span style={S.label}>I currently work here</span>
                   </label>
                 </div>
-                <div style={{ marginBottom: 12 }}>
+                <div style={{ marginBottom: 14 }}>
                   <label style={S.label}>
                     Job Description / Responsibilities
+                    <span style={{ fontSize: 11, color: "#64748b", marginLeft: 8 }}>
+                      (Edit anywhere, add bullets with • Insert Bullet)
+                    </span>
                   </label>
-                  <textarea
-                    style={S.textarea}
-                    placeholder={
-                      "• Led design for 3+ features\n• Conducted user research with 200+ participants"
+                  <RichTextEditor
+                    value={
+                      exp.descriptionHtml && exp.descriptionHtml.length > 0
+                        ? exp.descriptionHtml
+                        : bulletsToHtml(exp.bullets || [])
                     }
-                    value={(exp.bullets || []).map((b) => `• ${b}`).join("\n")}
-                    onChange={(e) => {
+                    onChange={(html) => {
                       const newExp = [...resume.experience];
-                      newExp[idx].bullets = e.target.value
-                        .split("\n")
-                        .map((l) => l.trim().replace(/^[–—\-•\u2022]\s*/, ""))
-                        .filter(Boolean);
+                      newExp[idx].descriptionHtml = html;
+                      newExp[idx].bullets = extractBulletsFromHtml(html);
                       setResume((r) => ({ ...r, experience: newExp }));
                       markTyping();
                     }}
+                    placeholder="Describe your impact. Use bullets for achievements and quantify results."
+                    minHeight={130}
                   />
                 </div>
 
@@ -2999,55 +3090,64 @@ export default function Builder() {
                 Hobbies
               </h3>
               {resume.hobbies && resume.hobbies.length > 0 ? (
-                resume.hobbies.map((hobby, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      marginBottom: 12,
-                      padding: "12px",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                    }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                    gap: "12px",
+                  }}>
+                  {resume.hobbies.map((hobby, idx) => (
                     <div
+                      key={idx}
                       style={{
-                        display: "flex",
-                        gap: "8px",
-                        alignItems: "center",
+                        padding: "12px",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "10px",
+                        background: "#fff",
+                        boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
                       }}>
-                      <input
-                        placeholder="Photography"
-                        style={{ ...S.input, flex: 1 }}
-                        value={hobby.name || ""}
-                        onChange={(e) => {
-                          const newHobbies = [...(resume.hobbies || [])];
-                          newHobbies[idx] = {
-                            ...newHobbies[idx],
-                            name: e.target.value,
-                          };
-                          setResume((r) => ({ ...r, hobbies: newHobbies }));
-                          markTyping();
-                        }}
-                      />
-                      <button
-                        type="button"
+                      <div
                         style={{
-                          ...S.btnGhost,
-                          borderColor: "#fecaca",
-                          color: "#dc2626",
-                          padding: "8px 12px",
-                        }}
-                        onClick={() => {
-                          const newHobbies = resume.hobbies.filter(
-                            (_, i) => i !== idx
-                          );
-                          setResume((r) => ({ ...r, hobbies: newHobbies }));
-                          markTyping();
+                          display: "flex",
+                          gap: "8px",
+                          alignItems: "center",
                         }}>
-                        Remove
-                      </button>
+                        <input
+                          placeholder="Photography"
+                          style={{ ...S.input, flex: 1, minWidth: 0 }}
+                          value={hobby.name || ""}
+                          onChange={(e) => {
+                            const newHobbies = [...(resume.hobbies || [])];
+                            newHobbies[idx] = {
+                              ...newHobbies[idx],
+                              name: e.target.value,
+                            };
+                            setResume((r) => ({ ...r, hobbies: newHobbies }));
+                            markTyping();
+                          }}
+                        />
+                        <button
+                          type="button"
+                          style={{
+                            ...S.btnGhost,
+                            borderColor: "#fecaca",
+                            color: "#dc2626",
+                            padding: "8px 12px",
+                            whiteSpace: "nowrap",
+                          }}
+                          onClick={() => {
+                            const newHobbies = resume.hobbies.filter(
+                              (_, i) => i !== idx
+                            );
+                            setResume((r) => ({ ...r, hobbies: newHobbies }));
+                            markTyping();
+                          }}>
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
                 <div
                   style={{
@@ -3204,11 +3304,19 @@ export default function Builder() {
                 </span>
               </label>
               <RichTextEditor
-                value={resume.contact.summary}
+                value={
+                  resume.contact.summary ||
+                  resume.contact.professionalSummary ||
+                  ""
+                }
                 onChange={(html) => {
                   setResume((r) => ({
                     ...r,
-                    contact: { ...r.contact, summary: html },
+                    contact: {
+                      ...r.contact,
+                      summary: html,
+                      professionalSummary: html,
+                    },
                   }));
                   markTyping();
                 }}
@@ -3231,7 +3339,11 @@ export default function Builder() {
                   onClick={() => {
                     setResume((r) => ({
                       ...r,
-                      contact: { ...r.contact, summary: "" },
+                      contact: {
+                        ...r.contact,
+                        summary: "",
+                        professionalSummary: "",
+                      },
                     }));
                     markTyping();
                   }}>
@@ -3361,31 +3473,6 @@ export default function Builder() {
           </>
         )}
 
-        {/* Resume Title */}
-        {resumeId && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 12,
-              padding: "12px",
-              background: "#f8fafc",
-              borderRadius: 10,
-              border: "1px solid #e5e7eb",
-            }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>
-                Resume Title
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
-                {resume.title || "Untitled Resume"}
-              </div>
-            </div>
-          </div>
-        )}
-
-
         {/* Navigation buttons */}
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
           <button
@@ -3418,7 +3505,7 @@ export default function Builder() {
               </span>
             )}
           </div>
-          <span style={S.hint}>
+          {/* <span style={S.hint}>
             {userIsTyping() ? (
               <span style={{ color: "#2563eb", fontWeight: 600 }}>
                 🔄 Updating…
@@ -3428,7 +3515,7 @@ export default function Builder() {
                 ✅ Live Preview
               </span>
             )}
-          </span>
+          </span> */}
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
             <button
               onClick={() => {
@@ -3511,7 +3598,7 @@ export default function Builder() {
   // ---------- completion handler (after JSX for clarity) ----------
   async function handleCompletion() {
     if (!resumeId) {
-      alert("Please save your resume first");
+      showAlert("Please save your resume first", "warning");
       return;
     }
     try {

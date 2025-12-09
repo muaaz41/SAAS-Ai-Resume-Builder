@@ -52,12 +52,11 @@ const ResumeStartFlow = () => {
   }, []);
 
   const handleSelectTemplate = (template) => {
-    // Check if user needs to sign up
+    // Check if user needs to sign in
     if (!token) {
-      // Save template choice and redirect to signup
       sessionStorage.setItem("pendingTemplateSlug", template.slug);
       sessionStorage.setItem("pendingFlow", "builder");
-      navigate("/signup", {
+      navigate("/signin", {
         state: { redirectTo: "/builder", templateSlug: template.slug },
       });
       return;
@@ -75,7 +74,7 @@ const ResumeStartFlow = () => {
   const handleUploadClick = () => {
     if (!token) {
       sessionStorage.setItem("pendingFlow", "upload");
-      navigate("/signup", {
+      navigate("/signin", {
         state: { redirectTo: "/dashboard", action: "upload" },
       });
       return;
@@ -95,9 +94,9 @@ const ResumeStartFlow = () => {
 
   const handleLinkedInImport = () => {
     if (!token) {
-      // Save flow state and redirect to signup
+      // Save flow state and redirect to sign in
       sessionStorage.setItem("pendingFlow", "linkedin-import");
-      navigate("/signup", {
+      navigate("/signin", {
         state: { redirectTo: "/resume-start", action: "linkedin-import" },
       });
       return;
@@ -169,7 +168,7 @@ const ResumeStartFlow = () => {
             marginBottom: "48px",
           }}>
           {/* LinkedIn Import Option */}
-          <div
+          {/* <div
             style={{
               background: "white",
               borderRadius: "16px",
@@ -226,7 +225,7 @@ const ResumeStartFlow = () => {
                 Connecting to LinkedIn...
               </div>
             )}
-          </div>
+          </div> */}
 
           {/* Start Fresh Option */}
           <div
@@ -320,7 +319,7 @@ const ResumeStartFlow = () => {
                 marginBottom: "12px",
                 textAlign: "center",
               }}>
-              Upload Existing Resume
+            Start with Existing Resume
             </h3>
             <p
               style={{

@@ -32,7 +32,7 @@ const RichTextToolbar = ({ onFormat, onInsertBullet }) => {
         borderBottom: "1px solid #e5e7eb",
         flexWrap: "wrap",
       }}>
-      <button
+      {/* <button
         type="button"
         onClick={() => onFormat("bold")}
         style={{ ...buttonStyle, fontWeight: "bold" }}
@@ -68,8 +68,8 @@ const RichTextToolbar = ({ onFormat, onInsertBullet }) => {
           background: "#cbd5e1",
           margin: "0 4px",
           alignSelf: "stretch",
-        }}
-      />
+        }} */}
+      {/* /> */}
 
       <button
         type="button"
@@ -81,7 +81,7 @@ const RichTextToolbar = ({ onFormat, onInsertBullet }) => {
         • Insert Bullet
       </button>
 
-      <button
+      {/* <button
         type="button"
         onClick={() => onFormat("insertUnorderedList")}
         style={buttonStyle}
@@ -108,7 +108,7 @@ const RichTextToolbar = ({ onFormat, onInsertBullet }) => {
           margin: "0 4px",
           alignSelf: "stretch",
         }}
-      />
+      /> */}
 
       {/* <button
         type="button"

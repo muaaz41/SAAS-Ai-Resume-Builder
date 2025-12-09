@@ -435,7 +435,7 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {loading && (
+      {/* {loading && (
         <div
           style={{
             position: "fixed",
@@ -477,7 +477,7 @@ export default function Dashboard() {
             </style>
           </div>
         </div>
-      )}
+      )} */}
 
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
         <style>{`#template-search::placeholder{color:${THEME.muted}}`}</style>
@@ -693,7 +693,7 @@ export default function Dashboard() {
                   : "0 4px 12px rgba(37, 99, 235, 0.3)";
             }}>
             <span style={{ fontSize: 18 }}>📤</span>
-            {resumes.length >= 5 ? "Limit Reached" : "Upload Resume"}
+            {resumes.length >= 5 ? "Limit Reached" : "Start with Existing Resume"}
           </button>
             <button
               onClick={() => setShowDeleteAccountModal(true)}
@@ -738,7 +738,8 @@ export default function Dashboard() {
                   margin: "0 0 6px 0",
                   color: "#0f172a",
                 }}>
-                Your Resumes {resumes.length > 0 && `(${resumes.length}/5)`}
+                Your Resumes{" "}
+                {!loading && resumes.length > 0 ? `(${resumes.length}/5)` : ""}
               </h2>
               <p
                 style={{
@@ -746,11 +747,13 @@ export default function Dashboard() {
                   color: "#64748b",
                   margin: 0,
                 }}>
-                {resumes.length === 0
+                {loading
+                  ? "Loading your resumes..."
+                  : resumes.length === 0
                   ? "Create your first professional resume"
                   : "Manage and edit your saved resumes"}
               </p>
-              {resumes.length >= 4 && resumes.length < 5 && (
+              {resumes.length >= 4 && resumes.length < 5 && !loading && (
                 <div
                   style={{
                     marginTop: 12,
@@ -770,7 +773,7 @@ export default function Dashboard() {
                 </span>
                 </div>
               )}
-              {resumes.length >= 5 && (
+              {resumes.length >= 5 && !loading && (
                 <div
                   style={{
                     marginTop: 12,
@@ -792,7 +795,18 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-          {resumes.length === 0 ? (
+          {loading ? (
+            <div
+              style={{
+                padding: "48px 32px",
+                background: "#f8fafc",
+                borderRadius: 16,
+                border: "1px solid #e2e8f0",
+                color: "#475569",
+              }}>
+              Loading your resumes…
+            </div>
+          ) : resumes.length === 0 ? (
             <div
               style={{
                 textAlign: "center",
@@ -1500,7 +1514,7 @@ export default function Dashboard() {
                   margin: "0 0 4px",
                   color: resumes.length >= 5 ? "#64748b" : "#0c4a6e",
                 }}>
-                Upload Resume
+                Start with Existing Resume
               </h3>
               <p style={{ fontSize: 13, color: resumes.length >= 5 ? "#94a3b8" : "#0369a1", margin: 0 }}>
                 {resumes.length >= 5

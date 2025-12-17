@@ -150,7 +150,7 @@ export default function Builder() {
   const [aiLoading, setAiLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [exportingFormat, setExportingFormat] = useState(null); // 'pdf' | 'docx' | 'txt' | null
+  const [exportingFormat, setExportingFormat] = useState(null); // 'pdf' | 'doc' | 'txt' | null
 
   const [serverPreview, setServerPreview] = useState("");
   const [serverPreviewUrl, setServerPreviewUrl] = useState("");
@@ -161,6 +161,15 @@ export default function Builder() {
   const [completionData, setCompletionData] = useState(null);
   const [aiGeneratedText, setAiGeneratedText] = useState(""); // For AI-generated text preview
   const [showAiPreview, setShowAiPreview] = useState(false); // Show/hide AI preview
+
+  // Prevent outer page scroll while in builder; restore on unmount
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   // typing + rate-limit guards
   const typingRef = useRef(0); // last keystroke timestamp
@@ -412,6 +421,7 @@ export default function Builder() {
       background: THEME.pageBg,
       padding: "20px 20px 20px",
       overflow: "hidden",
+      boxSizing: "border-box",
     },
     left: {
       background: THEME.cardBg,
@@ -422,6 +432,7 @@ export default function Builder() {
       overflow: "auto",
       height: "100%",
       color: THEME.text,
+      boxSizing: "border-box",
     },
     rightWrap: {
       background: THEME.panelBg,
@@ -434,6 +445,7 @@ export default function Builder() {
       boxShadow: "0 10px 30px rgba(15,23,42,0.05)",
       height: "100%",
       overflow: "hidden",
+      boxSizing: "border-box",
     },
     headerTitle: {
       fontSize: 20,
@@ -1163,6 +1175,45 @@ export default function Builder() {
     }
   };
 
+  // Reusable AI helper for other sections (uses jobDescription for context)
+  const generateAiForField = async (field, onApply, successLabel) => {
+    if (!jobDescription.trim()) {
+      showAlert(
+        "Please enter a job description first to help AI generate better content",
+        "warning"
+      );
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const res = await api.post("/api/v1/ai/suggest", {
+        field,
+        jobDescription: jobDescription || "",
+      });
+      const text =
+        res.data?.data?.suggestion ||
+        res.data?.suggestion ||
+        res.data?.text ||
+        "";
+      if (!text) {
+        showAlert("AI didn't return any suggestions. Please try again.", "error");
+        return;
+      }
+      onApply(text);
+      showAlert(successLabel || "AI content applied", "success", 3500);
+    } catch (err) {
+      console.error("AI Error:", err);
+      showAlert(
+        "Failed to generate AI content: " +
+          (err.response?.data?.message || err.message),
+        "error",
+        5000
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   // ---------- step marker (rate-limited) ----------
   const markStepDone = async (currentStep) => {
     if (!resumeId) return;
@@ -1295,21 +1346,6 @@ export default function Builder() {
     setExporting(true);
     setExportingFormat(format);
     try {
-      // For DOCX, use client-side Word export only (no backend)
-      if (format === "docx") {
-        exportClientWord();
-        showToast("Exported Word (.doc) from preview (no server)", {
-          type: "success",
-          duration: 1800,
-        });
-        // Close modal and redirect similar to server flow
-        try {
-          setShowCompletionModal(false);
-        } catch {}
-        setTimeout(() => navigate("/dashboard"), 300);
-        return;
-      }
-
       await upsertResume();
       // small delay to allow server to persist before rendering
       await new Promise((r) => setTimeout(r, 300));
@@ -1353,14 +1389,10 @@ export default function Builder() {
       const backendOrigin =
         "https://ai-resume-builder-backend-uhdm.onrender.com";
       const ts = Date.now();
-      const tpl = resume.templateSlug || selectedTemplate?.slug || "";
-      const templateQS = tpl ? `&templateSlug=${encodeURIComponent(tpl)}` : "";
-      const directUrl = `${backendOrigin}/api/v1/resumes/${resumeId}/export/${format}?t=${ts}${
-        format === "docx" ? templateQS : ""
-      }`;
-      const proxiedUrl = `/api/v1/resumes/${resumeId}/export/${format}?t=${ts}${
-        format === "docx" ? templateQS : ""
-      }`;
+      // Word export uses server-side rendered template HTML, same as PDF.
+      const serverFormat = format === "doc" ? "doc" : format;
+      const directUrl = `${backendOrigin}/api/v1/resumes/${resumeId}/export/${serverFormat}?t=${ts}`;
+      const proxiedUrl = `/api/v1/resumes/${resumeId}/export/${serverFormat}?t=${ts}`;
 
       const isLocal = /localhost|127\.0\.0\.1|::1/.test(
         window.location.hostname
@@ -1419,6 +1451,8 @@ export default function Builder() {
       const mimeType =
         format === "pdf"
           ? "application/pdf"
+          : format === "doc"
+          ? "application/msword"
           : format === "docx"
           ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           : "text/plain";
@@ -1465,6 +1499,7 @@ export default function Builder() {
             b[3] === 0x46 &&
             b[4] === 0x2d
           );
+        // DOC is HTML; DOCX is a ZIP (PK..). We only validate DOCX here.
         const badDocx = format === "docx" && !(b[0] === 0x50 && b[1] === 0x4b);
         if (badPdf || badDocx) {
           console.warn("Unexpected file header:", Array.from(b));
@@ -1537,7 +1572,7 @@ export default function Builder() {
         setTimeout(() => window.URL.revokeObjectURL(previewUrl), 10000);
       }
       // Fallback for DOCX that looks too small (often summary-only)
-      if (format === "docx" && (fileBlob?.size || 0) < 12000) {
+      if ((format === "docx" || format === "doc") && (fileBlob?.size || 0) < 12000) {
         console.warn(
           "[Export] DOCX blob appears small (",
           fileBlob?.size,
@@ -1605,9 +1640,9 @@ export default function Builder() {
         setExportingFormat(null);
         return;
       }
-      if (format === "docx") {
-        // Fallback to client-side Word export if server DOCX fails
-        showToast("Server DOCX failed. Exporting Word (.doc) from preview…", {
+      if (format === "doc" || format === "docx") {
+        // Fallback to client-side Word export if server Word export fails
+        showToast("Server Word export failed. Exporting Word (.doc) from preview…", {
           type: "warning",
           duration: 2200,
         });
@@ -2237,32 +2272,67 @@ export default function Builder() {
           ))}
         </div>
 
-        {/* Template summary */}
+        {/* Template Dropdown */}
         <div style={{ marginBottom: 14 }}>
           <label style={S.label}>Template *</label>
-          <div
+          <select
+            value={resume.templateSlug || ""}
+            onChange={(e) => {
+              const newSlug = e.target.value;
+              if (!newSlug) return;
+              
+              const newTemplate = templates.find((t) => t.slug === newSlug);
+              if (!newTemplate) return;
+              
+              // Check if premium template and user doesn't have access
+              const isPremium = newTemplate.category === "premium" || newTemplate.category === "industry";
+              if (isPremium && !hasPaidPlan) {
+                showToast("Subscribe to access this premium template", {
+                  type: "warning",
+                  duration: 4000,
+                });
+                // Reset dropdown to previous value
+                e.target.value = resume.templateSlug || "";
+                return;
+              }
+              
+              setSelectedTemplate(newTemplate);
+              setResume((r) => ({
+                ...r,
+                templateSlug: newSlug,
+              }));
+              markTyping();
+            }}
             style={{
               ...S.input,
-              borderColor: hasTemplateSelected ? "#dce3ef" : "#f59e0b",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              cursor: "default",
-              paddingRight: 16,
+              cursor: "pointer",
+              appearance: "none",
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 12px center",
+              paddingRight: "36px",
             }}>
-            <div
-              style={{
-                color: hasTemplateSelected ? THEME.text : "#94a3b8",
-                fontWeight: 600,
-              }}>
-              {hasTemplateSelected
-                ? `${templateDisplayName}${
-                    isPremiumTemplate ? " (Premium)" : ""
-                  }`
-                : "Select a template from the dashboard"}
-            </div>
-          </div>
+            <option value="" disabled>
+              {hasTemplateSelected ? "Select a different template..." : "Select a template..."}
+            </option>
+            {templates.map((template) => {
+              const isPremium = template.category === "premium" || template.category === "industry";
+              const isLocked = isPremium && !hasPaidPlan;
+              const templateName = formatTemplateName(template);
+              
+              return (
+                <option
+                  key={template.slug}
+                  value={template.slug}
+                  disabled={isLocked}
+                  style={{
+                    color: isLocked ? "#94a3b8" : THEME.text,
+                  }}>
+                  {templateName} {isPremium ? "(Premium)" : ""} {isLocked ? "🔒" : ""}
+                </option>
+              );
+            })}
+          </select>
           {!hasTemplateSelected && (
             <div
               style={{
@@ -2274,7 +2344,21 @@ export default function Builder() {
                 gap: "4px",
               }}>
               <span>⚠️</span>
-              Please select a template from the dashboard to start building your resume
+              Please select a template to start building your resume
+            </div>
+          )}
+          {isPremiumTemplate && !hasPaidPlan && (
+            <div
+              style={{
+                fontSize: "12px",
+                color: "#7c3aed",
+                marginTop: "4px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}>
+              <span>🔒</span>
+              Subscribe to access this premium template
             </div>
           )}
         </div>
@@ -2958,6 +3042,67 @@ export default function Builder() {
                   }}>
                   Optional: Add a score (0-100) if your template supports it
                 </div>
+                <div
+                  style={{
+                    background: "#eff6ff",
+                    border: "1px solid #93c5fd",
+                    borderRadius: 10,
+                    padding: 12,
+                    marginTop: 12,
+                  }}>
+                  <input
+                    placeholder="Describe your target role or paste job description for AI to suggest skills..."
+                    style={{
+                      ...S.input,
+                      marginBottom: 8,
+                      background: "#fff",
+                      border: "1px solid #93c5fd",
+                    }}
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                  />
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#1e40af",
+                      marginBottom: 8,
+                    }}>
+                    🤖 AI Assistant
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      ...S.btnSolid,
+                      width: "100%",
+                      background: "#2563eb",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                    }}
+                    disabled={aiLoading}
+                    onClick={() =>
+                      generateAiForField(
+                        "skills",
+                        (text) => {
+                          const items = text
+                            .split(/[,\n]/)
+                            .map((l) => l.trim())
+                            .filter(Boolean);
+                          const unique = Array.from(new Set(items));
+                          setResume((r) => ({
+                            ...r,
+                            skills: unique.map((name) => ({ name })),
+                          }));
+                          markTyping();
+                        },
+                        "AI skills applied"
+                      )
+                    }>
+                    {aiLoading ? "🔄 Generating..." : "✨ Suggest Skills with AI"}
+                  </button>
+                </div>
               </div>
             </div>
           </>
@@ -3014,6 +3159,64 @@ export default function Builder() {
                       }}
                     />
                   </div>
+                <div
+                  style={{
+                    background: "#eff6ff",
+                    border: "1px solid #93c5fd",
+                    borderRadius: 10,
+                    padding: 12,
+                    marginBottom: 12,
+                  }}>
+                  <input
+                    placeholder="Describe your target role or paste job description for AI to suggest a project description..."
+                    style={{
+                      ...S.input,
+                      marginBottom: 8,
+                      background: "#fff",
+                      border: "1px solid #93c5fd",
+                    }}
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                  />
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#1e40af",
+                      marginBottom: 8,
+                    }}>
+                    🤖 AI Assistant
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      ...S.btnSolid,
+                      width: "100%",
+                      background: "#2563eb",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                    }}
+                    disabled={aiLoading}
+                    onClick={() =>
+                      generateAiForField(
+                        "projectDescription",
+                        (text) => {
+                          const newProjects = [...(resume.projects || [])];
+                          newProjects[idx] = {
+                            ...newProjects[idx],
+                            description: text,
+                          };
+                          setResume((r) => ({ ...r, projects: newProjects }));
+                          markTyping();
+                        },
+                        "AI project description applied"
+                      )
+                    }>
+                    {aiLoading ? "🔄 Generating..." : "✨ Suggest Project Description with AI"}
+                  </button>
+                </div>
                   <div style={{ marginBottom: 12 }}>
                     <label style={S.label}>Link</label>
                     <input
@@ -3928,11 +4131,11 @@ function CompletionModal({
           </button>
           <button
             style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
-            onClick={() => onExport("docx")}
-            disabled={exporting && exportingFormat === "docx"}>
-            {exporting && exportingFormat === "docx"
+            onClick={() => onExport("doc")}
+            disabled={exporting && exportingFormat === "doc"}>
+            {exporting && exportingFormat === "doc"
               ? "Exporting..."
-              : "Download DOCX"}
+              : "Download Word"}
           </button>
           <button
             style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}

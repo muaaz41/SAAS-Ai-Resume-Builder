@@ -60,10 +60,72 @@ button {
 button:hover {
   border-color: #646cff;
 }
-button:focus,
+/* button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
+} */
+
+/* Add specific focus styles for different button types */
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Default focus glow for primary buttons */
+button:focus:not(:disabled),
+button:focus-visible:not(:disabled) {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.5) !important;
+  outline: none !important;
+  transform: translateY(-1px);
+}
+
+/* Hover states */
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Disabled state */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Specific button variant focus colors */
+button[data-variant="primary"]:focus:not(:disabled),
+button[data-variant="primary"]:focus-visible:not(:disabled) {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.5) !important;
+}
+
+button[data-variant="success"]:focus:not(:disabled),
+button[data-variant="success"]:focus-visible:not(:disabled) {
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.5) !important;
+}
+
+button[data-variant="warning"]:focus:not(:disabled),
+button[data-variant="warning"]:focus-visible:not(:disabled) {
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.5) !important;
+}
+
+button[data-variant="error"]:focus:not(:disabled),
+button[data-variant="error"]:focus-visible:not(:disabled) {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.5) !important;
+}
+
+button[data-variant="ghost"]:focus:not(:disabled),
+button[data-variant="ghost"]:focus-visible:not(:disabled) {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3) !important;
+  border-color: #93c5fd !important;
+}
+
 
 @media (prefers-color-scheme: light) {
   :root {

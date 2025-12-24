@@ -397,6 +397,7 @@ e.target.files[0] && handleFileSelect(e.target.files[0])
 <div style={S.fileInfo}>
 <div style={S.fileName}>📄 {file.name}</div>
 <button
+data-variant="error"
 style={S.removeBtn}
 onClick={() => {
 setFile(null);

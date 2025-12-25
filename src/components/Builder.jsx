@@ -4902,30 +4902,51 @@ export default function Builder() {
 
         if (wantedId && loaded) {
           setResumeId(wantedId);
-          // Merge with locally saved copy (client is source of truth for fields some backends omit)
+          // ✅ Prioritize server data (source of truth), use localStorage only as fallback for unsaved changes
           let merged = { ...loaded };
           try {
             const localRaw = localStorage.getItem(`resume-${wantedId}`);
             if (localRaw) {
               const localSaved = JSON.parse(localRaw);
+              // Only merge localStorage if server data is missing/empty for that field
               merged = {
                 ...merged,
                 contact: {
                   ...(merged.contact || {}),
-                  ...(localSaved.contact || {}),
+                  // Use server data first, fallback to localStorage only if server field is empty
+                  fullName: merged.contact?.fullName || localSaved.contact?.fullName || "",
+                  email: merged.contact?.email || localSaved.contact?.email || "",
+                  phone: merged.contact?.phone || localSaved.contact?.phone || "",
+                  location: merged.contact?.location || localSaved.contact?.location || "",
+                  address: merged.contact?.address || localSaved.contact?.address || "",
+                  website: merged.contact?.website || localSaved.contact?.website || "",
+                  github: merged.contact?.github || localSaved.contact?.github || "",
+                  linkedin: merged.contact?.linkedin || localSaved.contact?.linkedin || "",
+                  portfolioLink: merged.contact?.portfolioLink || localSaved.contact?.portfolioLink || "",
+                  summary: merged.contact?.summary || localSaved.contact?.summary || "",
+                  professionalSummary: merged.contact?.professionalSummary || localSaved.contact?.professionalSummary || merged.contact?.summary || localSaved.contact?.summary || "",
+                  headline: merged.contact?.headline || localSaved.contact?.headline || "",
                 },
-                experience:
-                  localSaved.experience && localSaved.experience.length > 0
-                    ? localSaved.experience
-                    : merged.experience || [],
-                education:
-                  localSaved.education && localSaved.education.length > 0
-                    ? localSaved.education
-                    : merged.education || [],
-                skills: Array.isArray(localSaved.skills)
-                  ? localSaved.skills
-                  : merged.skills || [],
-                title: localSaved.title || merged.title,
+                // ✅ Prioritize server arrays - only use localStorage if server array is empty
+                experience: (merged.experience && merged.experience.length > 0) 
+                  ? merged.experience 
+                  : (localSaved.experience && localSaved.experience.length > 0 ? localSaved.experience : []),
+                education: (merged.education && merged.education.length > 0)
+                  ? merged.education
+                  : (localSaved.education && localSaved.education.length > 0 ? localSaved.education : []),
+                skills: (Array.isArray(merged.skills) && merged.skills.length > 0)
+                  ? merged.skills
+                  : (Array.isArray(localSaved.skills) && localSaved.skills.length > 0 ? localSaved.skills : []),
+                projects: (Array.isArray(merged.projects) && merged.projects.length > 0)
+                  ? merged.projects
+                  : (Array.isArray(localSaved.projects) && localSaved.projects.length > 0 ? localSaved.projects : []),
+                hobbies: (Array.isArray(merged.hobbies) && merged.hobbies.length > 0)
+                  ? merged.hobbies
+                  : (Array.isArray(localSaved.hobbies) && localSaved.hobbies.length > 0 ? localSaved.hobbies : []),
+                awards: (Array.isArray(merged.awards) && merged.awards.length > 0)
+                  ? merged.awards
+                  : (Array.isArray(localSaved.awards) && localSaved.awards.length > 0 ? localSaved.awards : []),
+                title: merged.title || localSaved.title || "My Resume",
               };
             }
           } catch {

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import heroImg from "../assets/hero.png";
 import frameImg from "../assets/Frame.png";
 import lineCombinedImg from "../assets/linecombined.png";
@@ -7,8 +7,13 @@ import "../css/ATSChecker.css";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import { api } from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { Lock } from "lucide-react";
 
 const ATSChecker = () => {
+  const { token } = useAuth();
+  const navigate = useNavigate();
+
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [atsScore, setAtsScore] = useState(null);
@@ -17,6 +22,7 @@ const ATSChecker = () => {
   const [error, setError] = useState(null);
   const [jobDescription, setJobDescription] = useState("");
   const [progress, setProgress] = useState(0);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const handleRemoveFile = () => {
     setUploadedFile(null);
@@ -70,6 +76,13 @@ const ATSChecker = () => {
   };
 
   const handleATSScan = async () => {
+
+    if (!token) {
+      // Save current page so user returns here after login
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!uploadedFile) {
       alert("Please upload a resume file first.");
       return;
@@ -343,6 +356,7 @@ const ATSChecker = () => {
                   ) : (
                     <button
                       type="button"
+                      data-variant="error"
                       onClick={handleRemoveFile}
                       style={{
                         padding: "8px 14px",
@@ -683,6 +697,145 @@ const ATSChecker = () => {
             </div>
           </section>
         )}
+        {/* Auth Required Modal */}
+{showAuthModal && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0, 0, 0, 0.6)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      padding: "20px",
+      backdropFilter: "blur(4px)",
+    }}
+    onClick={() => setShowAuthModal(false)}
+  >
+    <div
+      style={{
+        background: "#ffffff",
+        borderRadius: "20px",
+        maxWidth: "480px",
+        width: "100%",
+        padding: "32px",
+        textAlign: "center",
+        boxShadow: "0 20px 50px rgba(0, 0, 0, 0.3)",
+        border: "1px solid #e2e8f0",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Icon */}
+      <div
+        style={{
+          width: 80,
+          height: 80,
+          background: "#eff6ff",
+          borderRadius: "50%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 20px",
+        }}
+      >
+        <Lock size={40} color="#2563eb" />
+      </div>
+
+      <h2
+        style={{
+          fontSize: "24px",
+          fontWeight: 700,
+          margin: "0 0 12px",
+          color: "#0f172a",
+        }}
+      >
+        Login Required
+      </h2>
+
+      <p
+        style={{
+          fontSize: "16px",
+          color: "#475569",
+          margin: "0 0 28px",
+          lineHeight: "1.6",
+        }}
+      >
+        You need to be logged in to run an ATS scan and view detailed results.
+      </p>
+
+      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+        <Link
+          to="/signin"
+          state={{ from: "/ats-checker" }} // Return here after login
+          style={{
+            flex: 1,
+            padding: "12px 20px",
+            background: "#2563eb",
+            color: "#fff",
+            borderRadius: "12px",
+            fontWeight: 600,
+            fontSize: 15,
+            textDecoration: "none",
+            boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow = "0 6px 16px rgba(37, 99, 235, 0.4)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 4px 12px rgba(37, 99, 235, 0.3)";
+          }}
+        >
+          Login
+        </Link>
+
+        <Link
+          to="/signup"
+          state={{ from: "/ats-checker" }}
+          style={{
+            flex: 1,
+            padding: "12px 20px",
+            background: "#fff",
+            color: "#2563eb",
+            border: "2px solid #93c5fd",
+            borderRadius: "12px",
+            fontWeight: 600,
+            fontSize: 15,
+            textDecoration: "none",
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#eff6ff";
+            e.currentTarget.style.transform = "translateY(-2px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "#fff";
+            e.currentTarget.style.transform = "translateY(0)";
+          }}
+        >
+          Sign Up
+        </Link>
+      </div>
+
+      <button
+        onClick={() => setShowAuthModal(false)}
+        style={{
+          marginTop: "20px",
+          background: "none",
+          border: "none",
+          color: "#64748b",
+          fontSize: "14px",
+          cursor: "pointer",
+        }}
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
 
       <Footer />
     </main>

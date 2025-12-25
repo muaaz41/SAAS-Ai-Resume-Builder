@@ -3126,7 +3126,7 @@ export default function Dashboard() {
                           </div>
                           <div
                             style={{
-                              fontSize: 13,
+                              fontSize: 14,
                               color: "#64748b",
                               display: "flex",
                               alignItems: "center",
@@ -3136,15 +3136,22 @@ export default function Dashboard() {
                             {isPremium && (
                               <span
                                 style={{
-                                  background: "#fbbf24",
+                                  background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
                                   color: "#fff",
-                                  padding: "2px 6px",
-                                  borderRadius: 4,
-                                  fontSize: 10,
-                                  fontWeight: 600,
-                                }}>
+                                  padding: "3px 8px",
+                                  borderRadius: "20px",
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  letterSpacing: "0.05em",
+                                  textTransform: "uppercase",
+                                  boxShadow: "0 1px 2px rgba(245, 158, 11, 0.2)",
+                                  border: "1px solid rgba(252, 211, 77, 0.5)",
+                                  display: "inline-block",
+                                  lineHeight: 1,
+                                }}
+                              >
                                 PREMIUM
-                </span>
+                              </span>
                             )}
                           </div>
                         </div>
@@ -4109,131 +4116,227 @@ function TemplatePreviewModal({
     <div
       style={{
         position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0, 0, 0, 0.5)",
+        inset: 0,
+        background: "rgba(0, 0, 0, 0.6)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1000,
         padding: "20px",
+        backdropFilter: "blur(4px)",
       }}
-      onClick={onClose}>
+      onClick={onClose}
+    >
       <div
         style={{
-          background: "white",
-          borderRadius: "12px",
-          width: "90vw",
-          maxWidth: "1200px",
-          maxHeight: "90vh",
+          background: "#ffffff",
+          borderRadius: "20px",
+          width: "95vw",
+          maxWidth: "900px",           // Narrower max width
+          height: "92vh",
+          maxHeight: "1000px",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          boxShadow: "0 25px 60px rgba(0, 0, 0, 0.3)",
+          border: "1px solid #e2e8f0",
         }}
-        onClick={(e) => e.stopPropagation()}>
-        {/* Modal Header */}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
         <div
           style={{
-            padding: "20px",
-            borderBottom: "1px solid #e5e7eb",
+            padding: "20px 28px",
+            background: "#f8fafc",
+            borderBottom: "1px solid #e2e8f0",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-          }}>
-          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>
-            {resume
-              ? `${resume.title || "Resume"} Preview`
-              : `${template?.name || "Template"} Preview`}
-          </h2>
+            flexShrink: 0,
+          }}
+        >
+          <div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "22px",
+                fontWeight: 700,
+                color: "#0f172a",
+              }}
+            >
+              {resume
+                ? resume.title || "Your Resume"
+                : template?.name || "Template Preview"}
+            </h2>
+            {template && (
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  fontSize: "14px",
+                  color: "#64748b",
+                }}
+              >
+                {template.name} • Live Preview
+              </p>
+            )}
+          </div>
           <button
             onClick={onClose}
             style={{
               background: "none",
               border: "none",
-              fontSize: "24px",
+              fontSize: "32px",
               cursor: "pointer",
-              color: "#6b7280",
-              padding: "4px",
-            }}>
+              color: "#64748b",
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+          >
             ×
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div style={{ flex: 1, overflow: "auto", padding: "20px" }}>
+        {/* Portrait Preview Body */}
+        <div
+          style={{
+            flex: 1,
+            overflow: "auto",
+            background: "#f1f5f9",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "flex-start",
+            padding: "32px 20px",
+          }}
+        >
           {loading ? (
-            <div style={{ textAlign: "center", padding: "40px" }}>
-              <div>Loading preview...</div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                color: "#64748b",
+              }}
+            >
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: "999px",
+                  border: "4px solid #e5e7eb",
+                  borderTopColor: "#2563eb",
+                  animation: "spin 1s linear infinite",
+                  marginBottom: 16,
+                }}
+              />
+              <div style={{ fontSize: 16, fontWeight: 600 }}>
+                Loading preview...
+              </div>
             </div>
           ) : (
-            <iframe
-              srcDoc={previewHtml}
+            <div
               style={{
-                width: "100%",
-                height: "600px",
-                border: "none",
+                width: "210mm",            // Standard A4 width in mm
+                minHeight: "297mm",        // Standard A4 height
+                background: "#fff",
+                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
                 borderRadius: "8px",
+                overflow: "hidden",
+                border: "1px solid #d1d5db",
               }}
-              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-              title="Resume Preview"
-            />
+            >
+              <iframe
+                srcDoc={previewHtml}
+                title="Resume Preview"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  minHeight: "297mm",
+                  border: "none",
+                  background: "#fff",
+                  display: "block",
+                }}
+                sandbox="allow-same-origin allow-scripts"
+              />
+            </div>
           )}
         </div>
 
-        {/* Modal Footer */}
+        {/* Footer */}
         <div
           style={{
-            padding: "20px",
-            borderTop: "1px solid #e5e7eb",
+            padding: "20px 28px",
+            background: "#f8fafc",
+            borderTop: "1px solid #e2e8f0",
             display: "flex",
-            gap: "12px",
             justifyContent: "flex-end",
-          }}>
+            gap: 12,
+            flexShrink: 0,
+          }}
+        >
           <button
             onClick={onClose}
             style={{
               padding: "10px 20px",
-              borderRadius: "8px",
-              border: "1px solid #d1d5db",
-              background: "white",
-              color: "#374151",
-              fontWeight: "600",
+              borderRadius: "12px",
+              border: "1px solid #cbd5e1",
+              background: "#fff",
+              color: "#475569",
+              fontWeight: 600,
+              fontSize: 14,
               cursor: "pointer",
-            }}>
-            Cancel
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+          >
+            Close
           </button>
-          {/* {resume ? (
+
+          {/* {!resume && template && (
             <button
-              onClick={exportClientWord}
+              onClick={() => onSelect?.(template)}
               style={{
-                padding: "10px 20px",
-                borderRadius: "8px",
-                border: "none",
+                padding: "10px 24px",
+                borderRadius: "12px",
                 background: "#2563eb",
-                color: "white",
-                fontWeight: "600",
+                color: "#fff",
+                border: "none",
+                fontWeight: 600,
+                fontSize: 14,
                 cursor: "pointer",
-              }}>
-              Download DOCX
+                boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 6px 16px rgba(37, 99, 235, 0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(37, 99, 235, 0.3)";
+              }}
+            >
+              Use This Template
             </button>
-          ) : null} */}
-          {/* <button
-            onClick={() => onSelect(template)}
-            style={{
-              padding: "10px 20px",
-              borderRadius: "8px",
-              border: "none",
-              background: template?.ui?.accentColor || "#2563eb",
-              color: "white",
-              fontWeight: "600",
-              cursor: "pointer",
-            }}>
-            Use This Template
-          </button> */}
+          )} */}
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

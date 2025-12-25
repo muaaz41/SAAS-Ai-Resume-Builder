@@ -4437,6 +4437,7 @@ export default function Builder() {
   const [completionData, setCompletionData] = useState(null);
   const [aiGeneratedText, setAiGeneratedText] = useState(""); // For AI-generated text preview
   const [showAiPreview, setShowAiPreview] = useState(false); // Show/hide AI preview
+  const [isTemplateLoading, setIsTemplateLoading] = useState(false);
 
   // Prevent outer page scroll while in builder; restore on unmount
   useEffect(() => {
@@ -6633,6 +6634,7 @@ export default function Builder() {
                 return;
               }
               
+              setIsTemplateLoading(true);
               setSelectedTemplate(newTemplate);
               setResume((r) => ({
                 ...r,
@@ -8225,6 +8227,42 @@ export default function Builder() {
           </div>
         </div>
         <div style={S.card}>
+
+          {/* Template Loading Overlay */}
+    {isTemplateLoading && (
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(255, 255, 255, 0.85)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 20,
+          backdropFilter: "blur(4px)",
+        }}
+      >
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: "50%",
+            border: "5px solid #e5e7eb",
+            borderTopColor: "#2563eb",
+            animation: "spin 1s linear infinite",
+            marginBottom: 16,
+          }}
+        />
+        <div style={{ fontSize: 16, fontWeight: 600, color: "#0f172a" }}>
+          Loading template...
+        </div>
+        <div style={{ fontSize: 13, color: "#64748b", marginTop: 8 }}>
+          Applying {selectedTemplate?.name || "new template"}
+        </div>
+      </div>
+    )}
+
           {/* Show loader during initialization or when waiting for server preview */}
           {isInitializing || (resumeId && !serverPreviewUrl && !serverPreview) ? (
             <div
@@ -8259,13 +8297,19 @@ export default function Builder() {
               </style>
             </div>
           ) : serverPreviewUrl ? (
-            <iframe title="preview" src={serverPreviewUrl} style={S.iframe} />
+            <iframe title="preview" src={serverPreviewUrl} style={S.iframe} onLoad={() => setIsTemplateLoading(false)}/>
           ) : serverPreview ? (
-            <iframe title="preview" srcDoc={serverPreview} style={S.iframe} />
+            <iframe title="preview" srcDoc={serverPreview} style={S.iframe} onLoad={() => setIsTemplateLoading(false)}/>
           ) : (
-            <iframe title="preview" srcDoc={previewHtml} style={S.iframe} />
+            <iframe title="preview" srcDoc={previewHtml} style={S.iframe} onLoad={() => setIsTemplateLoading(false)}/>
           )}
         </div>
+        <style jsx>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
 
       {/* Completion Modal */}
@@ -8328,6 +8372,319 @@ export default function Builder() {
 // ------------------------------
 // Completion Modal Component
 // ------------------------------
+// function CompletionModal({
+//   data,
+//   onClose,
+//   onExport,
+//   exporting,
+//   exportingFormat,
+// }) {
+//   const { resume, previewHtml, template, resumeId } = data;
+
+//   // Define formatDate function
+//   const formatDate = (dateStr) => {
+//     if (!dateStr) return "";
+//     const d = new Date(dateStr);
+//     return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+//   };
+
+//   // Define theme for this component
+//   const THEME = {
+//     pageBg: "#f2f4f7",
+//     cardBg: "#ffffff",
+//     panelBg: "#ffffff",
+//     border: "#dce3ef",
+//     text: "#0f172a",
+//     sub: "#64748b",
+//     muted: "#94a3b8",
+//     inputBg: "#ffffff",
+//   };
+
+//   // Define styles for this component
+//   const S = {
+//     sectionTitle: {
+//       fontSize: 18,
+//       fontWeight: 600,
+//       margin: "0 0 16px 0",
+//       color: THEME.text,
+//       borderBottom: `2px solid ${THEME.border}`,
+//       paddingBottom: 8,
+//     },
+//     label: {
+//       fontSize: 12,
+//       color: THEME.sub,
+//       marginBottom: 6,
+//       display: "block",
+//       fontWeight: 500,
+//     },
+//     grid2: {
+//       display: "grid",
+//       gridTemplateColumns: "1fr 1fr",
+//       gap: 12,
+//       marginBottom: 16,
+//     },
+//     btnSolid: {
+//     background: "#2563eb",
+//     color: "#ffffff",
+//     border: "none",
+//     borderRadius: "12px",
+//     padding: "12px 20px",
+//     fontWeight: 600,
+//     fontSize: "14px",
+//     cursor: "pointer",
+//     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
+//     transition: "all 0.2s ease-in-out",
+//   },
+//     btnGhost: {
+//       background: THEME.cardBg,
+//       color: "#2563eb",
+//       border: "1px solid #93c5fd",
+//       borderRadius: 10,
+//       padding: "12px 20px",
+//       fontSize: 14,
+//       fontWeight: 500,
+//       cursor: "pointer",
+//       transition: "all 0.2s",
+//     },
+//     small: {
+//       fontSize: 12,
+//       color: THEME.muted,
+//       margin: "2px 0",
+//     },
+//   };
+
+//   const modalStyles = {
+//     overlay: {
+//       position: "fixed",
+//       top: 0,
+//       left: 0,
+//       right: 0,
+//       bottom: 0,
+//       background: "rgba(0, 0, 0, 0.6)",
+//       display: "flex",
+//       alignItems: "center",
+//       justifyContent: "center",
+//       zIndex: 9999,
+//       padding: "20px",
+//     },
+//     modal: {
+//       background: "#fff",
+//       borderRadius: "20px",
+//       maxWidth: "1200px",
+//       width: "100%",
+//       maxHeight: "90vh",
+//       overflow: "hidden",
+//       boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+//       display: "flex",
+//       flexDirection: "column",
+//     },
+//     header: {
+//       padding: "24px 32px",
+//       borderBottom: "1px solid #e5e7eb",
+//       display: "flex",
+//       justifyContent: "space-between",
+//       alignItems: "center",
+//       background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
+//     },
+//     title: { fontSize: "24px", fontWeight: "700", color: "#0f172a", margin: 0 },
+//     subtitle: { fontSize: "14px", color: "#64748b", margin: "4px 0 0" },
+//     closeBtn: {
+//       background: "none",
+//       border: "none",
+//       fontSize: "28px",
+//       color: "#64748b",
+//       cursor: "pointer",
+//       padding: "8px",
+//       borderRadius: "8px",
+//       transition: "all 0.2s",
+//     },
+//     body: { flex: 1, display: "flex", overflow: "hidden" },
+//     leftPanel: {
+//       flex: 1,
+//       padding: "32px",
+//       overflow: "auto",
+//       borderRight: "1px solid #e5e7eb",
+//     },
+//     rightPanel: {
+//       flex: 1,
+//       padding: "32px",
+//       background: THEME.panelBg,
+//       display: "flex",
+//       flexDirection: "column",
+//       minHeight: 0,
+//     },
+//   };
+//   return (
+//     <div style={modalStyles.overlay}>
+//       <div style={modalStyles.modal}>
+//         <div style={modalStyles.header}>
+//           <div>
+//             <h2 style={modalStyles.title}>{resume.title || "Your Resume"}</h2>
+//             <p style={modalStyles.subtitle}>
+//               {template?.name || template?.slug}
+//             </p>
+//           </div>
+//           <button style={modalStyles.closeBtn} onClick={onClose}>
+//             ×
+//           </button>
+//         </div>
+//         <div style={modalStyles.body}>
+//           <div style={modalStyles.leftPanel}>
+//             <h3 style={S.sectionTitle}>Contact Information</h3>
+//             <div style={S.grid2}>
+//               <div>
+//                 <p style={S.label}>Full Name:</p>
+//                 <p>{resume.contact.fullName}</p>
+//               </div>
+//               <div>
+//                 <p style={S.label}>Email:</p>
+//                 <p>{resume.contact.email}</p>
+//               </div>
+//               <div>
+//                 <p style={S.label}>Phone:</p>
+//                 <p>{resume.contact.phone}</p>
+//               </div>
+//               <div>
+//                 <p style={S.label}>Location:</p>
+//                 <p>{resume.contact.address}</p>
+//               </div>
+//               <div>
+//                 <p style={S.label}>Website:</p>
+//                 <p>{resume.contact.website}</p>
+//               </div>
+//               <div>
+//                 <p style={S.label}>Headline:</p>
+//                 <p>{resume.contact.headline}</p>
+//               </div>
+//             </div>
+
+//             <h3 style={S.sectionTitle}>Experience</h3>
+//             {resume.experience.map((exp, idx) => (
+//               <div key={idx} style={{ marginBottom: 12 }}>
+//                 <p style={S.label}>
+//                   {exp.title || "Job Title"} at {exp.company || "Company"}
+//                 </p>
+//                 <p style={S.small}>
+//                   {formatDate(exp.startDate)} -{" "}
+//                   {exp.current ? "Present" : formatDate(exp.endDate)}
+//                 </p>
+//                 <ul style={{ margin: "4px 0 0 20px", fontSize: 13 }}>
+//                   {exp.bullets.map((bullet, bulletIdx) => (
+//                     <li key={bulletIdx}>{bullet}</li>
+//                   ))}
+//                 </ul>
+//               </div>
+//             ))}
+
+//             <h3 style={S.sectionTitle}>Education</h3>
+//             {resume.education.map((edu, idx) => (
+//               <div key={idx} style={{ marginBottom: 12 }}>
+//                 <p style={S.label}>
+//                   {edu.degree || "Degree"} in {edu.school || "School"}
+//                 </p>
+//                 <p style={S.small}>
+//                   {formatDate(edu.startDate)} -{" "}
+//                   {edu.endDate ? formatDate(edu.endDate) : "Graduation"}
+//                 </p>
+//                 <p style={S.small}>{edu.location ? `• ${edu.location}` : ""}</p>
+//                 <ul style={{ margin: "4px 0 0 20px", fontSize: 13 }}>
+//                   {edu.details.map((detail, detailIdx) => (
+//                     <li key={detailIdx}>{detail}</li>
+//                   ))}
+//                 </ul>
+//               </div>
+//             ))}
+
+//             <h3 style={S.sectionTitle}>Skills</h3>
+//             <div style={S.chipRow}>
+//               {resume.skills.map((skill, idx) => (
+//                 <span key={idx} style={S.chip}>
+//                   {skill.name || skill}
+//                 </span>
+//               ))}
+//             </div>
+//           </div>
+//           <div style={modalStyles.rightPanel}>
+//             <h3 style={S.sectionTitle}>Resume Preview</h3>
+//             <div
+//               style={{
+//                 border: "1px solid #e5e7eb",
+//                 borderRadius: "8px",
+//                 overflow: "hidden",
+//                 flex: 1,
+//                 minHeight: 0,
+//               }}>
+//               {previewHtml ? (
+//                 <iframe
+//                   title="resume-preview"
+//                   srcDoc={previewHtml}
+//                   style={{
+//                     width: "100%",
+//                     height: "100%",
+//                     border: "none",
+//                     background: "white",
+//                   }}
+//                 />
+//               ) : (
+//                 <div
+//                   style={{
+//                     display: "flex",
+//                     alignItems: "center",
+//                     justifyContent: "center",
+//                     height: "100%",
+//                     color: "#64748b",
+//                     fontSize: "14px",
+//                   }}>
+//                   Loading preview...
+//                 </div>
+//               )}
+//             </div>
+//           </div>
+//         </div>
+//         <div
+//           style={{
+//             padding: "16px 32px",
+//             borderTop: "1px solid #e5e7eb",
+//             position: "sticky",
+//             bottom: 0,
+//             background: "#fff",
+//           }}>
+//           <button
+//             style={{ ...S.btnSolid, width: "100%" }}
+//             onClick={() => onExport("pdf")}
+//             disabled={exporting && exportingFormat === "pdf"}>
+//             {exporting && exportingFormat === "pdf"
+//               ? "Exporting..."
+//               : "Download PDF"}
+//           </button>
+//           <button
+//             style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
+//             onClick={() => onExport("doc")}
+//             disabled={exporting && exportingFormat === "doc"}>
+//             {exporting && exportingFormat === "doc"
+//               ? "Exporting..."
+//               : "Download Word"}
+//           </button>
+//           <button
+//             style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
+//             onClick={() => onExport("txt")}
+//             disabled={exporting && exportingFormat === "txt"}>
+//             {exporting && exportingFormat === "txt"
+//               ? "Exporting..."
+//               : "Download TXT"}
+//           </button>
+//           <button
+//             style={{ ...S.btnGhost, width: "100%", marginTop: 10 }}
+//             onClick={onClose}>
+//             Close
+//           </button>
+//         </div>
+//       </div>
+
+//     </div>
+//   );
+// }
+
 function CompletionModal({
   data,
   onClose,
@@ -8337,14 +8694,12 @@ function CompletionModal({
 }) {
   const { resume, previewHtml, template, resumeId } = data;
 
-  // Define formatDate function
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     const d = new Date(dateStr);
     return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
   };
 
-  // Define theme for this component
   const THEME = {
     pageBg: "#f2f4f7",
     cardBg: "#ffffff",
@@ -8356,12 +8711,11 @@ function CompletionModal({
     inputBg: "#ffffff",
   };
 
-  // Define styles for this component
   const S = {
     sectionTitle: {
-      fontSize: 18,
+      fontSize: 17,
       fontWeight: 600,
-      margin: "0 0 16px 0",
+      margin: "0 0 14px 0",
       color: THEME.text,
       borderBottom: `2px solid ${THEME.border}`,
       paddingBottom: 8,
@@ -8369,43 +8723,59 @@ function CompletionModal({
     label: {
       fontSize: 12,
       color: THEME.sub,
-      marginBottom: 6,
+      marginBottom: 5,
       display: "block",
       fontWeight: 500,
+      textTransform: "uppercase",
+      letterSpacing: "0.5px",
     },
     grid2: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
-      gap: 12,
-      marginBottom: 16,
+      gap: 16,
+      marginBottom: 20,
     },
     btnSolid: {
-    background: "#2563eb",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "12px",
-    padding: "12px 20px",
-    fontWeight: 600,
-    fontSize: "14px",
-    cursor: "pointer",
-    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
-    transition: "all 0.2s ease-in-out",
-  },
+      background: "#2563eb",
+      color: "#ffffff",
+      border: "none",
+      borderRadius: "10px",
+      padding: "10px 16px",
+      fontWeight: 600,
+      fontSize: "13px",
+      cursor: "pointer",
+      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+      transition: "all 0.2s ease",
+    },
     btnGhost: {
-      background: THEME.cardBg,
+      background: "transparent",
       color: "#2563eb",
       border: "1px solid #93c5fd",
-      borderRadius: 10,
-      padding: "12px 20px",
-      fontSize: 14,
+      borderRadius: "10px",
+      padding: "10px 16px",
+      fontSize: "13px",
       fontWeight: 500,
       cursor: "pointer",
-      transition: "all 0.2s",
+      transition: "all 0.2s ease",
     },
     small: {
       fontSize: 12,
       color: THEME.muted,
       margin: "2px 0",
+    },
+    chipRow: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 8,
+    },
+    chip: {
+      background: "#e0e7ff",
+      color: "#4f46e5",
+      padding: "6px 12px",
+      borderRadius: "20px",
+      fontSize: 12,
+      fontWeight: 500,
     },
   };
 
@@ -8426,50 +8796,71 @@ function CompletionModal({
     modal: {
       background: "#fff",
       borderRadius: "20px",
-      maxWidth: "1200px",
+      maxWidth: "1280px",
       width: "100%",
-      maxHeight: "90vh",
+      height: "92vh",
+      maxHeight: "96vh",
       overflow: "hidden",
-      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+      boxShadow: "0 25px 60px -12px rgba(0, 0, 0, 0.3)",
       display: "flex",
       flexDirection: "column",
     },
     header: {
-      padding: "24px 32px",
-      borderBottom: "1px solid #e5e7eb",
+      padding: "18px 28px",
+      borderBottom: " solid #e5e7eb",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
+      flexShrink: 0,
     },
-    title: { fontSize: "24px", fontWeight: "700", color: "#0f172a", margin: 0 },
-    subtitle: { fontSize: "14px", color: "#64748b", margin: "4px 0 0" },
+    title: { fontSize: "22px", fontWeight: "700", color: "#0f172a", margin: 0 },
+    subtitle: { fontSize: "13px", color: "#64748b", margin: "4px 0 0" },
     closeBtn: {
       background: "none",
       border: "none",
       fontSize: "28px",
       color: "#64748b",
       cursor: "pointer",
-      padding: "8px",
+      padding: "6px",
       borderRadius: "8px",
       transition: "all 0.2s",
     },
-    body: { flex: 1, display: "flex", overflow: "hidden" },
+    body: { 
+      flex: 1, 
+      display: "flex", 
+      overflow: "hidden",
+      minHeight: 0,
+    },
     leftPanel: {
-      flex: 1,
-      padding: "32px",
+      width: "420px",
+      minWidth: "420px",
+      padding: "28px 32px",
       overflow: "auto",
       borderRight: "1px solid #e5e7eb",
+      display: "flex",
+      flexDirection: "column",
+      background: "#fafbfc",
     },
     rightPanel: {
-      flex: 1,
-      padding: "32px",
+      flex: 2,
+      padding: "28px 32px",
       background: THEME.panelBg,
       display: "flex",
       flexDirection: "column",
       minHeight: 0,
     },
+    footerButtons: {
+      marginTop: "auto",
+      paddingTop: "20px",
+      borderTop: "1px solid #e5e7eb",
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      paddingBottom: "8px",
+    },
   };
+
   return (
     <div style={modalStyles.overlay}>
       <div style={modalStyles.modal}>
@@ -8477,99 +8868,131 @@ function CompletionModal({
           <div>
             <h2 style={modalStyles.title}>{resume.title || "Your Resume"}</h2>
             <p style={modalStyles.subtitle}>
-              {template?.name || template?.slug}
+              Template: {template?.name || template?.slug}
             </p>
           </div>
           <button style={modalStyles.closeBtn} onClick={onClose}>
             ×
           </button>
         </div>
+
         <div style={modalStyles.body}>
           <div style={modalStyles.leftPanel}>
-            <h3 style={S.sectionTitle}>Contact Information</h3>
-            <div style={S.grid2}>
-              <div>
-                <p style={S.label}>Full Name:</p>
-                <p>{resume.contact.fullName}</p>
+            <div style={{ flex: 1, overflowY: "auto", paddingRight: 8 }}>
+              <h3 style={S.sectionTitle}>Contact Information</h3>
+              <div style={S.grid2}>
+                <div>
+                  <span style={S.label}>Name</span>
+                  <p>{resume.contact.fullName}</p>
+                </div>
+                <div>
+                  <span style={S.label}>Email</span>
+                  <p>{resume.contact.email}</p>
+                </div>
+                <div>
+                  <span style={S.label}>Phone</span>
+                  <p>{resume.contact.phone}</p>
+                </div>
+                <div>
+                  <span style={S.label}>Location</span>
+                  <p>{resume.contact.address}</p>
+                </div>
+                <div>
+                  <span style={S.label}>Website</span>
+                  <p>{resume.contact.website || "-"}</p>
+                </div>
+                <div>
+                  <span style={S.label}>Headline</span>
+                  <p>{resume.contact.headline || "-"}</p>
+                </div>
               </div>
-              <div>
-                <p style={S.label}>Email:</p>
-                <p>{resume.contact.email}</p>
-              </div>
-              <div>
-                <p style={S.label}>Phone:</p>
-                <p>{resume.contact.phone}</p>
-              </div>
-              <div>
-                <p style={S.label}>Location:</p>
-                <p>{resume.contact.address}</p>
-              </div>
-              <div>
-                <p style={S.label}>Website:</p>
-                <p>{resume.contact.website}</p>
-              </div>
-              <div>
-                <p style={S.label}>Headline:</p>
-                <p>{resume.contact.headline}</p>
+
+              <h3 style={S.sectionTitle}>Experience</h3>
+              {resume.experience.map((exp, idx) => (
+                <div key={idx} style={{ marginBottom: 16 }}>
+                  <p style={{ fontWeight: 600, margin: "0 0 4px" }}>
+                    {exp.title || "Job Title"} <span style={{ color: THEME.sub }}>at {exp.company || "Company"}</span>
+                  </p>
+                  <p style={S.small}>
+                    {formatDate(exp.startDate)} – {exp.current ? "Present" : formatDate(exp.endDate)}
+                  </p>
+                  <ul style={{ margin: "8px 0 0 20px", fontSize: 13, lineHeight: "1.5" }}>
+                    {exp.bullets.map((bullet, i) => (
+                      <li key={i}>{bullet}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+
+              <h3 style={S.sectionTitle}>Education</h3>
+              {resume.education.map((edu, idx) => (
+                <div key={idx} style={{ marginBottom: 16 }}>
+                  <p style={{ fontWeight: 600 }}>
+                    {edu.degree} in {edu.field || ""} — {edu.school}
+                  </p>
+                  <p style={S.small}>
+                    {formatDate(edu.startDate)} – {edu.endDate ? formatDate(edu.endDate) : "Expected Graduation"}
+                    {edu.location ? ` • ${edu.location}` : ""}
+                  </p>
+                  {edu.details.length > 0 && (
+                    <ul style={{ margin: "8px 0 0 20px", fontSize: 13 }}>
+                      {edu.details.map((d, i) => <li key={i}>{d}</li>)}
+                    </ul>
+                  )}
+                </div>
+              ))}
+
+              <h3 style={S.sectionTitle}>Skills</h3>
+              <div style={S.chipRow}>
+                {resume.skills.map((skill, idx) => (
+                  <span key={idx} style={S.chip}>
+                    {typeof skill === "string" ? skill : skill.name}
+                  </span>
+                ))}
               </div>
             </div>
 
-            <h3 style={S.sectionTitle}>Experience</h3>
-            {resume.experience.map((exp, idx) => (
-              <div key={idx} style={{ marginBottom: 12 }}>
-                <p style={S.label}>
-                  {exp.title || "Job Title"} at {exp.company || "Company"}
-                </p>
-                <p style={S.small}>
-                  {formatDate(exp.startDate)} -{" "}
-                  {exp.current ? "Present" : formatDate(exp.endDate)}
-                </p>
-                <ul style={{ margin: "4px 0 0 20px", fontSize: 13 }}>
-                  {exp.bullets.map((bullet, bulletIdx) => (
-                    <li key={bulletIdx}>{bullet}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-
-            <h3 style={S.sectionTitle}>Education</h3>
-            {resume.education.map((edu, idx) => (
-              <div key={idx} style={{ marginBottom: 12 }}>
-                <p style={S.label}>
-                  {edu.degree || "Degree"} in {edu.school || "School"}
-                </p>
-                <p style={S.small}>
-                  {formatDate(edu.startDate)} -{" "}
-                  {edu.endDate ? formatDate(edu.endDate) : "Graduation"}
-                </p>
-                <p style={S.small}>{edu.location ? `• ${edu.location}` : ""}</p>
-                <ul style={{ margin: "4px 0 0 20px", fontSize: 13 }}>
-                  {edu.details.map((detail, detailIdx) => (
-                    <li key={detailIdx}>{detail}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-
-            <h3 style={S.sectionTitle}>Skills</h3>
-            <div style={S.chipRow}>
-              {resume.skills.map((skill, idx) => (
-                <span key={idx} style={S.chip}>
-                  {skill.name || skill}
-                </span>
-              ))}
+            {/* Buttons moved here, sticky at bottom of left panel */}
+            <div style={modalStyles.footerButtons}>
+              <button
+                style={S.btnSolid}
+                onClick={() => onExport("pdf")}
+                disabled={exporting && exportingFormat === "pdf"}
+              >
+                {exporting && exportingFormat === "pdf" ? "Exporting PDF..." : "Download PDF"}
+              </button>
+              <button
+                style={S.btnSolid}
+                onClick={() => onExport("doc")}
+                disabled={exporting && exportingFormat === "doc"}
+              >
+                {exporting && exportingFormat === "doc" ? "Exporting DOC..." : "Download Word"}
+              </button>
+              <button
+                style={S.btnSolid}
+                onClick={() => onExport("txt")}
+                disabled={exporting && exportingFormat === "txt"}
+              >
+                {exporting && exportingFormat === "txt" ? "Exporting TXT..." : "Download TXT"}
+              </button>
+              {/* <button style={S.btnGhost} onClick={onClose}>
+                Close
+              </button> */}
             </div>
           </div>
+
           <div style={modalStyles.rightPanel}>
             <h3 style={S.sectionTitle}>Resume Preview</h3>
             <div
               style={{
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                overflow: "hidden",
                 flex: 1,
-                minHeight: 0,
-              }}>
+                border: "1px solid #e2e8f0",
+                borderRadius: "12px",
+                overflow: "hidden",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+                background: "#fff",
+              }}
+            >
               {previewHtml ? (
                 <iframe
                   title="resume-preview"
@@ -8578,65 +9001,28 @@ function CompletionModal({
                     width: "100%",
                     height: "100%",
                     border: "none",
-                    background: "white",
+                    background: "#fff",
                   }}
+                  sandbox="allow-same-origin allow-scripts"
                 />
               ) : (
                 <div
                   style={{
+                    height: "100%",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    height: "100%",
-                    color: "#64748b",
-                    fontSize: "14px",
-                  }}>
+                    color: "#94a3b8",
+                    fontSize: 15,
+                  }}
+                >
                   Loading preview...
                 </div>
               )}
             </div>
           </div>
         </div>
-        <div
-          style={{
-            padding: "16px 32px",
-            borderTop: "1px solid #e5e7eb",
-            position: "sticky",
-            bottom: 0,
-            background: "#fff",
-          }}>
-          <button
-            style={{ ...S.btnSolid, width: "100%" }}
-            onClick={() => onExport("pdf")}
-            disabled={exporting && exportingFormat === "pdf"}>
-            {exporting && exportingFormat === "pdf"
-              ? "Exporting..."
-              : "Download PDF"}
-          </button>
-          <button
-            style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
-            onClick={() => onExport("doc")}
-            disabled={exporting && exportingFormat === "doc"}>
-            {exporting && exportingFormat === "doc"
-              ? "Exporting..."
-              : "Download Word"}
-          </button>
-          <button
-            style={{ ...S.btnSolid, width: "100%", marginTop: 10 }}
-            onClick={() => onExport("txt")}
-            disabled={exporting && exportingFormat === "txt"}>
-            {exporting && exportingFormat === "txt"
-              ? "Exporting..."
-              : "Download TXT"}
-          </button>
-          <button
-            style={{ ...S.btnGhost, width: "100%", marginTop: 10 }}
-            onClick={onClose}>
-            Close
-          </button>
-        </div>
       </div>
-
     </div>
   );
 }

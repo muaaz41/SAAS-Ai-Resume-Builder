@@ -122,7 +122,7 @@ const Landing = () => {
       </section>
 
       {/* Tools Section */}
-      <section
+      {/* <section
         className="tools"
         style={{ padding: "60px 20px", backgroundColor: "#f8fafc" }}>
         <div
@@ -280,7 +280,7 @@ const Landing = () => {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       <section className="brands">
         <img className="brands-img" src={brandsImg} alt="Brands" />

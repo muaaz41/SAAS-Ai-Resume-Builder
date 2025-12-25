@@ -40,15 +40,15 @@ const Navbar = () => {
                 style={{ alignSelf: "center", fontSize: 12, color: "#334155" }}>
                 {user?.email}
               </span>
-              <button className="btn-outline" onClick={logout}>
-                Logout
-              </button>
               <Link
                 className="btn-solid"
                 to="/builder"
                 state={{ startFresh: true }}>
                 Open Builder
               </Link>
+              <button className="btn-outline" onClick={logout}>
+                Logout
+              </button>
             </>
           ) : (
             <>

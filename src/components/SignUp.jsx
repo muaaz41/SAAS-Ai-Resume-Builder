@@ -11,6 +11,7 @@ import {
   googleLogout,
   hasGrantedAnyScopeGoogle,
 } from "@react-oauth/google";
+import { Calendar } from "@phosphor-icons/react";
 
 const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -220,7 +221,7 @@ const SignUp = () => {
                   value={dob}
                   onChange={(e) => setDob(e.target.value)}
                 />
-                <span className="calendar-icon">📅</span>
+                <span className="calendar-icon"><Calendar size={20} weight="regular" /></span>
               </div>
             </div>
 

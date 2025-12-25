@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../lib/api.js";
 import { showToast } from "../lib/toast";
+import { XCircle } from "@phosphor-icons/react";
 
 export default function LinkedInCallback() {
   const { loginWithLinkedIn, token } = useAuth();
@@ -109,8 +110,8 @@ export default function LinkedInCallback() {
       }}>
       {error ? (
         <>
-          <div style={{ color: "#dc2626", fontSize: "18px", marginBottom: "16px" }}>
-            ❌ {error}
+          <div style={{ color: "#dc2626", fontSize: "18px", marginBottom: "16px", display: "flex", alignItems: "center", gap: 8 }}>
+            <XCircle size={20} weight="fill" /> {error}
           </div>
           <button
             onClick={() => navigate("/resume-start")}

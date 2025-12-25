@@ -28,6 +28,7 @@ import { useNavigate } from "react-router-dom";
 import "../css/Landing.css";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 import { showToast } from "../lib/toast";
 import { api } from "../lib/api.js";
 
@@ -177,7 +178,7 @@ const Landing = () => {
                 e.target.style.boxShadow = "0 4px 6px -1px rgba(0, 0, 0, 0.1)";
                 e.target.style.borderColor = "transparent";
               }}>
-              <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🔍</div>
+              <div style={{ marginBottom: "16px", display: "flex", justifyContent: "center" }}><MagnifyingGlass size={48} weight="regular" /></div>
               <h3
                 style={{
                   fontSize: "1.5rem",

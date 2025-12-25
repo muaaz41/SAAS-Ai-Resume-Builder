@@ -6,6 +6,7 @@ import { showToast } from "../lib/toast";
 import ResumeUpload from "./ResumeUpload.jsx";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import { Briefcase } from "@phosphor-icons/react";
 
 const HIDDEN_TEMPLATE_NAMES = new Set([
   // Add any templates to hide here
@@ -192,8 +193,11 @@ const ResumeStartFlow = () => {
                 fontSize: "48px",
                 marginBottom: "16px",
                 textAlign: "center",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
               }}>
-              💼
+              <Briefcase size={48} weight="regular" />
             </div>
             <h3
               style={{

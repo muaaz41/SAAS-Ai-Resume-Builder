@@ -8,6 +8,8 @@ import "../css/Pricing.css";
 import { api } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { showToast } from "../lib/toast";
+import { Warning } from "@phosphor-icons/react";
+import { showConfirm } from "../lib/alert.js";
 
 const Pricing = () => {
   const navigate = useNavigate();
@@ -195,7 +197,7 @@ const Pricing = () => {
       subscriptionStatus?.hasActiveSubscription &&
       subscriptionStatus?.plan !== planType
     ) {
-      const confirmed = window.confirm(
+      const confirmed = await showConfirm(
         `You currently have a ${subscriptionStatus.plan} plan. Do you want to change to ${planType}? You'll be charged the prorated difference.`
       );
       if (confirmed) {
@@ -346,7 +348,7 @@ const Pricing = () => {
       }
     }
 
-    const confirmed = window.confirm(
+    const confirmed = await showConfirm(
       `Are you sure you want to cancel your ${subscriptionStatus.plan} subscription? You will retain access until ${periodEndText}, after which you'll be downgraded to the free plan.`
     );
 
@@ -590,7 +592,7 @@ const Pricing = () => {
                               color: "#fef2f2",
                               fontWeight: 600,
                             }}>
-                            ⚠️ Subscription will end on{" "}
+                            <Warning size={16} weight="fill" style={{ display: "inline-block", marginRight: 6, verticalAlign: "middle" }} /> Subscription will end on{" "}
                             {periodEnd.toLocaleDateString()}
                           </div>
                         );
@@ -607,7 +609,7 @@ const Pricing = () => {
                         color: "#fef2f2",
                         fontWeight: 600,
                       }}>
-                      ⚠️ Subscription will end at the end of your billing period
+                      <Warning size={16} weight="fill" style={{ display: "inline-block", marginRight: 6, verticalAlign: "middle" }} /> Subscription will end at the end of your billing period
                     </div>
                   );
                 })()}

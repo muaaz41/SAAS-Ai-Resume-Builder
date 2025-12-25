@@ -9,6 +9,8 @@ import Footer from "./Footer";
 import { api } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { Lock } from "lucide-react";
+import { FileText } from "@phosphor-icons/react";
+import { showAlert } from "../lib/alert.js";
 
 const ATSChecker = () => {
   const { token } = useAuth();
@@ -71,7 +73,7 @@ const ATSChecker = () => {
       setAtsResults(null);
       setError(null);
     } else {
-      alert("Please upload a PDF, DOC, or DOCX file.");
+      showAlert("Please upload a PDF, DOC, or DOCX file.");
     }
   };
 
@@ -84,7 +86,7 @@ const ATSChecker = () => {
     }
 
     if (!uploadedFile) {
-      alert("Please upload a resume file first.");
+      showAlert("Please upload a resume file first.");
       return;
     }
 
@@ -319,7 +321,7 @@ const ATSChecker = () => {
             onDrop={handleDrop}>
             {!uploadedFile ? (
               <>
-                <div className="upload-icon">📄</div>
+                <div className="upload-icon"><FileText size={48} weight="regular" /></div>
                 <h4>Drag and drop your resume here</h4>
                 <p>
                   Or upload from your computer. We accept PDF, DOC, DOCX files.
@@ -337,7 +339,7 @@ const ATSChecker = () => {
               </>
             ) : (
               <div className="uploaded-file">
-                <div className="file-icon">📄</div>
+                <div className="file-icon"><FileText size={32} weight="regular" /></div>
                 <div className="file-info">
                   <div className="file-name">{uploadedFile.name}</div>
                   <div className="file-size">

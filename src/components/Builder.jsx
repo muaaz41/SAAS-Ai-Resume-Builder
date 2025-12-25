@@ -4280,6 +4280,7 @@ import RichTextEditor from "./RichTextEditor.jsx";
 import { showToast } from "../lib/toast";
 import { ArrowLeft, Eye, Lock } from "lucide-react";
 import { CalendarDots,  LockKeyIcon,  Sparkle } from "@phosphor-icons/react";
+import { showAlert, showConfirm } from "../lib/alert.js";
 
 const HIDDEN_TEMPLATE_NAMES = new Set([
   // "Modern Flat",
@@ -4380,10 +4381,8 @@ const cleanResumeData = (data) => {
   };
 };
 
-// Small helper to standardize inline alerts across the builder
-const showAlert = (message, type = "info", duration = 4000) => {
-  showToast(message, { type, duration });
-};
+// Note: showAlert and showConfirm are imported from ../lib/alert.js for modal dialogs
+// Use showToast() for non-blocking toast notifications
 
 const formatTemplateName = (template) => {
   if (!template) return "";
@@ -4775,17 +4774,17 @@ export default function Builder() {
     small: { fontSize: 12, color: THEME.muted },
     btnRow: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" },
     btnSolid: {
-    background: "#2563eb",
+      background: "#2563eb",
     color: "#ffffff",
     border: "none",
     borderRadius: "12px",
     padding: "12px 20px",
-    fontWeight: 600,
+      fontWeight: 600,
     fontSize: "14px",
-    cursor: "pointer",
+      cursor: "pointer",
     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
     transition: "all 0.2s ease-in-out",
-  },
+    },
     btnGhost: {
       background: THEME.cardBg,
       color: "#2563eb",
@@ -5348,25 +5347,25 @@ export default function Builder() {
 
   // ---------- AI helpers ----------
   const generateSummary = async () => {
-  if (!jobDescription.trim()) {
-    showToast(
-      "Please enter a job description first to help AI generate better content",
-      { type: "warning" }
-    );
-    return;
-  }
-  setAiLoading(true);
-  try {
-    const res = await api.post("/api/v1/ai/suggest", {
-      field: "summary",
-      jobDescription: jobDescription || "",
-    });
-    const text =
-      res.data?.data?.text ||
-      res.data?.data?.suggestion ||
-      res.data?.text ||
-      "";
-    if (text) {
+    if (!jobDescription.trim()) {
+      showToast(
+        "Please enter a job description first to help AI generate better content",
+        { type: "warning" }
+      );
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const res = await api.post("/api/v1/ai/suggest", {
+        field: "summary",
+        jobDescription: jobDescription || "",
+      });
+      const text =
+        res.data?.data?.text ||
+        res.data?.data?.suggestion ||
+        res.data?.text ||
+        "";
+      if (text) {
       // Directly set the generated text into the resume summary
       setResume((r) => ({
         ...r,
@@ -5381,26 +5380,26 @@ export default function Builder() {
       // Clear the job description input
       setJobDescription("");
       
-      showToast(
+        showToast(
         "✅ AI Summary generated! You can edit it directly above.",
         { type: "success", duration: 3000 }
+        );
+      } else {
+        showToast("AI didn't return any suggestions. Please try again.", {
+          type: "error",
+        });
+      }
+    } catch (err) {
+      console.error("AI Error:", err);
+      showToast(
+        "Failed to generate AI summary: " +
+          (err.response?.data?.message || err.message),
+        { type: "error" }
       );
-    } else {
-      showToast("AI didn't return any suggestions. Please try again.", {
-        type: "error",
-      });
+    } finally {
+      setAiLoading(false);
     }
-  } catch (err) {
-    console.error("AI Error:", err);
-    showToast(
-      "Failed to generate AI summary: " +
-        (err.response?.data?.message || err.message),
-      { type: "error" }
-    );
-  } finally {
-    setAiLoading(false);
-  }
-};
+  };
 
   const applyAiGeneratedText = () => {
     if (aiGeneratedText.trim()) {
@@ -5637,7 +5636,7 @@ export default function Builder() {
         console.warn("Failed to save resume data:", e);
       }
       
-      const shouldSignup = window.confirm(
+      const shouldSignup = await showConfirm(
         "You need to sign up to download your resume.\n\nYour progress will be saved. Would you like to sign up now?"
       );
       if (shouldSignup) {
@@ -5864,6 +5863,21 @@ export default function Builder() {
         // ignore header check failures
       }
 
+      // Check file size BEFORE downloading to avoid double downloads
+      // Fallback for DOCX/DOC that looks too small (often summary-only)
+      if ((format === "docx" || format === "doc") && (fileBlob?.size || 0) < 12000) {
+        console.warn(
+          "[Export] DOCX/DOC blob appears small (",
+          fileBlob?.size,
+          ") — falling back to client Word .doc export."
+        );
+        exportClientWord();
+        setExporting(false);
+        setExportingFormat(null);
+        return;
+      }
+
+      // Download the file
       const url = window.URL.createObjectURL(fileBlob);
       const a = document.createElement("a");
       a.href = url;
@@ -5882,16 +5896,6 @@ export default function Builder() {
         const previewUrl = window.URL.createObjectURL(fileBlob);
         setTimeout(() => window.open(previewUrl, "_blank"), 0);
         setTimeout(() => window.URL.revokeObjectURL(previewUrl), 10000);
-      }
-      // Fallback for DOCX that looks too small (often summary-only)
-      if ((format === "docx" || format === "doc") && (fileBlob?.size || 0) < 12000) {
-        console.warn(
-          "[Export] DOCX blob appears small (",
-          fileBlob?.size,
-          ") — falling back to client Word .doc export."
-        );
-        exportClientWord();
-        return;
       }
       showToast(`Resume exported as ${format.toUpperCase()}. Redirecting…`, {
         type: "success",
@@ -5938,7 +5942,7 @@ export default function Builder() {
           console.warn("Failed to save resume before upgrade:", e);
         }
         
-        const shouldUpgrade = window.confirm(
+        const shouldUpgrade = await showConfirm(
           `${errorMessage}\n\nUpgrade to Professional or Premium plan to download your resume in PDF, DOCX, or TXT format.\n\nYour progress will be saved. Would you like to upgrade now?`
         );
         if (shouldUpgrade) {
@@ -6556,10 +6560,10 @@ export default function Builder() {
             <h2 style={S.headerTitle}>{stepTitles[step - 1]}</h2>
             <div style={S.headerSub}>{stepSubtitles[step - 1]}</div>
           </div>
-        <button
-          type="button"
-          onClick={() => navigate("/dashboard")}
-          style={{
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard")}
+            style={{
             padding: "10px 18px",
             fontSize: 14,
             fontWeight: 500,
@@ -6573,7 +6577,7 @@ export default function Builder() {
             justifyContent: "center",
             gap: "8px",
             transition: "all 0.2s ease",
-            whiteSpace: "nowrap",
+              whiteSpace: "nowrap",
             position: "relative",
             overflow: "hidden",
             boxShadow: "0 1px 2px rgba(37, 99, 235, 0.1)",
@@ -6592,7 +6596,7 @@ export default function Builder() {
           }}>
           <ArrowLeft size={16} />
           <span>Back to Dashboard</span>
-        </button>
+          </button>
         </div>
 
         {/* Stepper */}
@@ -6704,7 +6708,7 @@ export default function Builder() {
 
         {/* STEP 1: BASICS */}
         {step === 1 && (
-        <>
+          <>
           <section>
             <div
               style={{
@@ -6723,147 +6727,147 @@ export default function Builder() {
                 {/* Left Column */}
                 <div>
                   <div style={{ marginBottom: 16 }}>
-                    <label style={S.label}>Full Name *</label>
-                    <input
-                      placeholder="John Doe"
-                      style={S.input}
+              <label style={S.label}>Full Name *</label>
+              <input
+                placeholder="John Doe"
+                style={S.input}
                       value={resume.contact.fullName || ""}
-                      onChange={(e) => {
-                        setResume((r) => ({
-                          ...r,
-                          contact: { ...r.contact, fullName: e.target.value },
-                        }));
-                        markTyping();
-                      }}
-                    />
-                  </div>
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
+                    contact: { ...r.contact, fullName: e.target.value },
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
 
                   <div style={{ marginBottom: 16 }}>
-                    <label style={S.label}>Email *</label>
-                    <input
-                      type="email"
-                      placeholder="john@example.com"
-                      style={S.input}
+              <label style={S.label}>Email *</label>
+              <input
+                type="email"
+                placeholder="john@example.com"
+                style={S.input}
                       value={resume.contact.email || ""}
-                      onChange={(e) => {
-                        setResume((r) => ({
-                          ...r,
-                          contact: { ...r.contact, email: e.target.value },
-                        }));
-                        markTyping();
-                      }}
-                    />
-                  </div>
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
+                    contact: { ...r.contact, email: e.target.value },
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
 
                   <div style={{ marginBottom: 16 }}>
-                    <label style={S.label}>Phone</label>
-                    <input
-                      placeholder="+1 234 567 8901"
-                      style={S.input}
+              <label style={S.label}>Phone</label>
+              <input
+                placeholder="+1 234 567 8901"
+                style={S.input}
                       value={resume.contact.phone || ""}
-                      onChange={(e) => {
-                        setResume((r) => ({
-                          ...r,
-                          contact: { ...r.contact, phone: e.target.value },
-                        }));
-                        markTyping();
-                      }}
-                    />
-                  </div>
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
+                    contact: { ...r.contact, phone: e.target.value },
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
 
                   <div style={{ marginBottom: 16 }}>
-                    <label style={S.label}>Location *</label>
-                    <input
-                      placeholder="New York, NY"
-                      style={S.input}
-                      value={resume.contact.location || ""}
-                      onChange={(e) => {
-                        setResume((r) => ({
-                          ...r,
-                          contact: { ...r.contact, location: e.target.value },
-                        }));
-                        markTyping();
-                      }}
-                    />
-                  </div>
+              <label style={S.label}>Location *</label>
+              <input
+                placeholder="New York, NY"
+                style={S.input}
+                value={resume.contact.location || ""}
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
+                    contact: { ...r.contact, location: e.target.value },
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
                 </div>
 
                 {/* Right Column */}
                 <div>
                   <div style={{ marginBottom: 16 }}>
                     <label style={S.label}>Job Title / Headline</label>
-                    <input
+              <input
                       placeholder="Product Designer (UX/UI)"
-                      style={S.input}
+                style={S.input}
                       value={resume.contact.headline || ""}
-                      onChange={(e) => {
-                        setResume((r) => ({
-                          ...r,
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
                           contact: { ...r.contact, headline: e.target.value },
-                        }));
-                        markTyping();
-                      }}
-                    />
-                  </div>
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
 
                   <div style={{ marginBottom: 16 }}>
-                    <label style={S.label}>LinkedIn</label>
-                    <input
-                      placeholder="https://linkedin.com/in/username"
-                      style={S.input}
-                      value={resume.contact.linkedin || ""}
-                      onChange={(e) => {
-                        setResume((r) => ({
-                          ...r,
-                          contact: { ...r.contact, linkedin: e.target.value },
-                        }));
-                        markTyping();
-                      }}
-                    />
-                  </div>
+              <label style={S.label}>LinkedIn</label>
+              <input
+                placeholder="https://linkedin.com/in/username"
+                style={S.input}
+                value={resume.contact.linkedin || ""}
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
+                    contact: { ...r.contact, linkedin: e.target.value },
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
 
                   <div style={{ marginBottom: 16 }}>
                     <label style={S.label}>GitHub</label>
-                    <input
+              <input
                       placeholder="https://github.com/username"
-                      style={S.input}
+                style={S.input}
                       value={resume.contact.github || ""}
-                      onChange={(e) => {
-                        setResume((r) => ({
-                          ...r,
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
                           contact: { ...r.contact, github: e.target.value },
-                        }));
-                        markTyping();
-                      }}
-                    />
-                  </div>
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
 
                   <div style={{ marginBottom: 16 }}>
                     <label style={S.label}>Portfolio Link</label>
-                    <input
+              <input
                       placeholder="https://yourportfolio.com"
-                      style={S.input}
+                style={S.input}
                       value={resume.contact.portfolioLink || ""}
-                      onChange={(e) => {
-                        setResume((r) => ({
-                          ...r,
+                onChange={(e) => {
+                  setResume((r) => ({
+                    ...r,
                           contact: { ...r.contact, portfolioLink: e.target.value },
-                        }));
-                        markTyping();
-                      }}
-                    />
-                  </div>
+                  }));
+                  markTyping();
+                }}
+              />
+            </div>
                 </div>
               </div>
 
               {/* Optional hint if key fields are empty */}
               {(!resume.contact.fullName || !resume.contact.email || !resume.contact.location) && (
-                <div
-                  style={{
+              <div
+                style={{
                     marginTop: 20,
                     padding: "16px",
                     textAlign: "center",
-                    color: "#64748b",
+                  color: "#64748b",
                     fontSize: "14px",
                     background: "#f8fafc",
                     borderRadius: "10px",
@@ -6871,12 +6875,12 @@ export default function Builder() {
                   }}
                 >
                   Fill in your name, email, and location to get started!
-                </div>
+              </div>
               )}
             </div>
           </section>
-        </>
-      )}
+          </>
+        )}
 
         {/* STEP 3: EXPERIENCE */}
         {step === 3 && (
@@ -6884,10 +6888,10 @@ export default function Builder() {
             <section>
               {resume.experience && resume.experience.length > 0 ? (
                 <div style={{ display: "grid", gap: 28 }}>
-                  {resume.experience.map((exp, idx) => (
-                    <div
-                      key={idx}
-                      style={{
+            {resume.experience.map((exp, idx) => (
+              <div
+                key={idx}
+                style={{
                         padding: "20px",
                         border: "1px solid #e2e8f0",
                         borderRadius: "12px",
@@ -6897,165 +6901,165 @@ export default function Builder() {
                     >
                       {/* Job Title */}
                       <div style={{ marginBottom: 16 }}>
-                        <label style={S.label}>Job Title *</label>
-                        <input
-                          placeholder="Senior Product Designer"
-                          style={S.input}
+                  <label style={S.label}>Job Title *</label>
+                  <input
+                    placeholder="Senior Product Designer"
+                    style={S.input}
                           value={exp.title || ""}
-                          onChange={(e) => {
-                            const newExp = [...resume.experience];
-                            newExp[idx].title = e.target.value;
-                            setResume((r) => ({ ...r, experience: newExp }));
-                            markTyping();
-                          }}
-                        />
-                      </div>
+                    onChange={(e) => {
+                      const newExp = [...resume.experience];
+                      newExp[idx].title = e.target.value;
+                      setResume((r) => ({ ...r, experience: newExp }));
+                      markTyping();
+                    }}
+                  />
+                </div>
 
                       {/* Company */}
                       <div style={{ marginBottom: 16 }}>
-                        <label style={S.label}>Company *</label>
-                        <input
-                          placeholder="TechCorp Inc"
-                          style={S.input}
+                  <label style={S.label}>Company *</label>
+                  <input
+                    placeholder="TechCorp Inc"
+                    style={S.input}
                           value={exp.company || ""}
-                          onChange={(e) => {
-                            const newExp = [...resume.experience];
-                            newExp[idx].company = e.target.value;
-                            setResume((r) => ({ ...r, experience: newExp }));
-                            markTyping();
-                          }}
-                        />
-                      </div>
+                    onChange={(e) => {
+                      const newExp = [...resume.experience];
+                      newExp[idx].company = e.target.value;
+                      setResume((r) => ({ ...r, experience: newExp }));
+                      markTyping();
+                    }}
+                  />
+                </div>
 
                       {/* Location */}
                       <div style={{ marginBottom: 16 }}>
-                        <label style={S.label}>Location</label>
-                        <input
-                          placeholder="New York, NY"
-                          style={S.input}
+                  <label style={S.label}>Location</label>
+                  <input
+                    placeholder="New York, NY"
+                    style={S.input}
                           value={exp.location || ""}
-                          onChange={(e) => {
-                            const newExp = [...resume.experience];
-                            newExp[idx].location = e.target.value;
-                            setResume((r) => ({ ...r, experience: newExp }));
-                            markTyping();
-                          }}
-                        />
-                      </div>
+                    onChange={(e) => {
+                      const newExp = [...resume.experience];
+                      newExp[idx].location = e.target.value;
+                      setResume((r) => ({ ...r, experience: newExp }));
+                      markTyping();
+                    }}
+                  />
+                </div>
 
                       {/* Dates - Now consistent with other inputs */}
                       <div style={{ ...S.grid2, marginBottom: 16 }}>
-                        <div>
-                          <label style={S.label}>
+                  <div>
+                    <label style={S.label}>
                             <CalendarDots size={18} color="#3b82f6" style={{ verticalAlign: "middle", marginRight: "6px" }} />
                             Start Date *
                             <span style={{ fontSize: 11, color: "#64748b" }}> (MM/DD/YYYY)</span>
-                          </label>
-                          <input
-                            type="date"
+                    </label>
+                    <input
+                      type="date"
                             style={S.input}  // Consistent style
                             value={exp.startDate || ""}
-                            onFocus={openNativeDatePicker}
-                            onClick={openNativeDatePicker}
-                            onChange={(e) => {
-                              const newExp = [...resume.experience];
-                              newExp[idx].startDate = e.target.value;
-                              setResume((r) => ({ ...r, experience: newExp }));
-                              markTyping();
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label style={S.label}>
+                      onFocus={openNativeDatePicker}
+                      onClick={openNativeDatePicker}
+                      onChange={(e) => {
+                        const newExp = [...resume.experience];
+                        newExp[idx].startDate = e.target.value;
+                        setResume((r) => ({ ...r, experience: newExp }));
+                        markTyping();
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={S.label}>
                             <CalendarDots size={18} color="#3b82f6" style={{ verticalAlign: "middle", marginRight: "6px" }} />
                             End Date
                             <span style={{ fontSize: 11, color: "#64748b" }}> (or check "current")</span>
-                          </label>
-                          <input
-                            type="date"
-                            style={{
+                    </label>
+                    <input
+                      type="date"
+                      style={{
                               ...S.input,
-                              opacity: exp.current ? 0.5 : 1,
-                              cursor: exp.current ? "not-allowed" : "pointer",
-                            }}
+                        opacity: exp.current ? 0.5 : 1,
+                        cursor: exp.current ? "not-allowed" : "pointer",
+                      }}
                             value={exp.endDate || ""}
-                            disabled={exp.current}
-                            onFocus={openNativeDatePicker}
-                            onClick={openNativeDatePicker}
-                            onChange={(e) => {
-                              const newExp = [...resume.experience];
-                              newExp[idx].endDate = e.target.value;
-                              setResume((r) => ({ ...r, experience: newExp }));
-                              markTyping();
-                            }}
-                          />
-                        </div>
-                      </div>
+                      disabled={exp.current}
+                      onFocus={openNativeDatePicker}
+                      onClick={openNativeDatePicker}
+                      onChange={(e) => {
+                        const newExp = [...resume.experience];
+                        newExp[idx].endDate = e.target.value;
+                        setResume((r) => ({ ...r, experience: newExp }));
+                        markTyping();
+                      }}
+                    />
+                  </div>
+                </div>
 
                       {/* Current Job Checkbox */}
                       <div style={{ marginBottom: 16 }}>
                         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                          <input
-                            type="checkbox"
+                    <input
+                      type="checkbox"
                             checked={exp.current || false}
-                            onChange={(e) => {
-                              const newExp = [...resume.experience];
-                              newExp[idx].current = e.target.checked;
-                              if (e.target.checked) newExp[idx].endDate = "";
-                              setResume((r) => ({ ...r, experience: newExp }));
-                              markTyping();
-                            }}
+                      onChange={(e) => {
+                        const newExp = [...resume.experience];
+                        newExp[idx].current = e.target.checked;
+                        if (e.target.checked) newExp[idx].endDate = "";
+                        setResume((r) => ({ ...r, experience: newExp }));
+                        markTyping();
+                      }}
                             style={{ width: 16, height: 16 }}
-                          />
+                    />
                           <span style={{ ...S.label, margin: 0 }}>I currently work here</span>
-                        </label>
-                      </div>
+                  </label>
+                </div>
 
                       {/* Job Description / Bullets */}
                       <div style={{ marginBottom: 20 }}>
-                        <label style={S.label}>
-                          Job Description / Responsibilities
-                          <span style={{ fontSize: 11, color: "#64748b", marginLeft: 8 }}>
-                            (Edit anywhere, add bullets with • Insert Bullet)
-                          </span>
-                        </label>
-                        <RichTextEditor
-                          value={
-                            exp.descriptionHtml && exp.descriptionHtml.length > 0
-                              ? exp.descriptionHtml
-                              : bulletsToHtml(exp.bullets || [])
-                          }
-                          onChange={(html) => {
-                            const newExp = [...resume.experience];
-                            newExp[idx].descriptionHtml = html;
-                            newExp[idx].bullets = extractBulletsFromHtml(html);
-                            setResume((r) => ({ ...r, experience: newExp }));
-                            markTyping();
-                          }}
-                          placeholder="Describe your impact. Use bullets for achievements and quantify results."
+                  <label style={S.label}>
+                    Job Description / Responsibilities
+                    <span style={{ fontSize: 11, color: "#64748b", marginLeft: 8 }}>
+                      (Edit anywhere, add bullets with • Insert Bullet)
+                    </span>
+                  </label>
+                  <RichTextEditor
+                    value={
+                      exp.descriptionHtml && exp.descriptionHtml.length > 0
+                        ? exp.descriptionHtml
+                        : bulletsToHtml(exp.bullets || [])
+                    }
+                    onChange={(html) => {
+                      const newExp = [...resume.experience];
+                      newExp[idx].descriptionHtml = html;
+                      newExp[idx].bullets = extractBulletsFromHtml(html);
+                      setResume((r) => ({ ...r, experience: newExp }));
+                      markTyping();
+                    }}
+                    placeholder="Describe your impact. Use bullets for achievements and quantify results."
                           minHeight={140}
-                        />
-                      </div>
+                  />
+                </div>
 
                       {/* AI Assistant - Clean, integrated, button on right */}
                       <div style={{ marginBottom: 20 }}>
                       <div style={{ fontSize: "13px", fontWeight: 600, color: "#1e40af", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
                         <span>🤖</span> AI Assistant
-                      </div>
+                  </div>
 
                       {/* Input field - full width */}
-                      <input
+                  <input
                         placeholder="Paste job description or describe the role for AI to generate bullet points..."
                         style={{ ...S.input, width: "100%", marginBottom: 10 }}
-                        value={jobDescription}
-                        onChange={(e) => setJobDescription(e.target.value)}
-                      />
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                  />
 
                       {/* Button - now directly below the input */}
                       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 2 }}>
-                      <button
-                        type="button"
-                        style={{
+                  <button
+                    type="button"
+                    style={{
                           ...S.btnGhost,
                           width: "fit-content",
                           padding: "8px 16px",
@@ -7065,19 +7069,19 @@ export default function Builder() {
                           color: aiLoading ? "#94a3b8" : "#2563eb",
                           borderColor: aiLoading ? "#cbd5e1" : "#93c5fd",
                           justifyContent: "center",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                        disabled={aiLoading}
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                    disabled={aiLoading}
                         onClick={() => generateExperienceBullets(idx)}
                       >
                         {aiLoading ? "🔄 Generating..." : "✨ Generate Bullets"}
-                      </button>
+                  </button>
                       </div>
-                    </div>
-                    </div>
-                  ))}
+                </div>
+              </div>
+            ))}
                 </div>
               ) : (
                 <div
@@ -7107,77 +7111,77 @@ export default function Builder() {
                   flexWrap: "wrap",
                 }}
               >
-                <button
-                  type="button"
+            <button
+              type="button"
                   style={{
                     ...S.btnGhost,
                     padding: "10px 16px",
                     fontSize: "14px",
                   }}
-                  onClick={() =>
-                    setResume((r) => ({
-                      ...r,
-                      experience: [
-                        ...r.experience,
-                        {
-                          title: "",
-                          company: "",
-                          location: "",
-                          startDate: "",
-                          endDate: "",
-                          current: false,
-                          bullets: [],
-                        },
-                      ],
-                    }))
+              onClick={() =>
+                setResume((r) => ({
+                  ...r,
+                  experience: [
+                    ...r.experience,
+                    {
+                      title: "",
+                      company: "",
+                      location: "",
+                      startDate: "",
+                      endDate: "",
+                      current: false,
+                      bullets: [],
+                    },
+                  ],
+                }))
                   }
                 >
                   + Add Experience
-                </button>
+            </button>
 
-                {resume.experience.length > 1 && (
-                  <button
-                    type="button"
+            {resume.experience.length > 1 && (
+              <button
+                type="button"
                     data-variant="error"
-                    style={{
-                      ...S.btnGhost,
-                      borderColor: "#fecaca",
-                      color: "#dc2626",
+                style={{
+                  ...S.btnGhost,
+                  borderColor: "#fecaca",
+                  color: "#dc2626",
                       padding: "10px 16px",
                       fontSize: "14px",
-                    }}
-                    onClick={() =>
-                      setResume((r) => ({
-                        ...r,
-                        experience: r.experience.slice(0, -1),
-                      }))
+                }}
+                onClick={() =>
+                  setResume((r) => ({
+                    ...r,
+                    experience: r.experience.slice(0, -1),
+                  }))
                     }
                   >
                     Undo
-                  </button>
-                )}
+              </button>
+            )}
 
-                {resume.experience.length > 0 && (
-                  <button
-                    type="button"
+            {resume.experience.length > 0 && (
+              <button
+                type="button"
                     data-variant="error"
-                    style={{
-                      ...S.btnGhost,
-                      borderColor: "#fecaca",
-                      color: "#dc2626",
+                style={{
+                  ...S.btnGhost,
+                  borderColor: "#fecaca",
+                  color: "#dc2626",
                       padding: "10px 16px",
                       fontSize: "14px",
-                    }}
-                    onClick={() =>
-                      setResume((r) => ({
-                        ...r,
+                }}
+                onClick={() =>
+                  setResume((r) => ({
+                    ...r,
                         experience: r.experience.length > 1 ? [r.experience[0]] : [],
-                      }))
+                  }))
                     }
                   >
                     Clear
-                  </button>
-                )}
+              </button>
+            )}
               </div>
             </section>
           </>
@@ -7190,7 +7194,7 @@ export default function Builder() {
             <section>
               {resume.education && resume.education.length > 0 ? (
                 <div style={{ display: "grid", gap: 28 }}>
-                  {resume.education.map((edu, idx) => (
+            {resume.education.map((edu, idx) => (
                     <div
                       key={idx}
                       style={{
@@ -7203,117 +7207,117 @@ export default function Builder() {
                     >
                       {/* Degree */}
                       <div style={{ marginBottom: 16 }}>
-                        <label style={S.label}>Degree *</label>
-                        <input
-                          placeholder="BA in Interaction Design"
-                          style={S.input}
+                  <label style={S.label}>Degree *</label>
+                  <input
+                    placeholder="BA in Interaction Design"
+                    style={S.input}
                           value={edu.degree || ""}
-                          onChange={(e) => {
-                            const newEdu = [...resume.education];
-                            newEdu[idx].degree = e.target.value;
-                            setResume((r) => ({ ...r, education: newEdu }));
-                            markTyping();
-                          }}
-                        />
-                      </div>
+                    onChange={(e) => {
+                      const newEdu = [...resume.education];
+                      newEdu[idx].degree = e.target.value;
+                      setResume((r) => ({ ...r, education: newEdu }));
+                      markTyping();
+                    }}
+                  />
+                </div>
 
                       {/* School */}
                       <div style={{ marginBottom: 16 }}>
-                        <label style={S.label}>School / University *</label>
-                        <input
-                          placeholder="University of Design"
-                          style={S.input}
+                  <label style={S.label}>School / University *</label>
+                  <input
+                    placeholder="University of Design"
+                    style={S.input}
                           value={edu.school || ""}
-                          onChange={(e) => {
-                            const newEdu = [...resume.education];
-                            newEdu[idx].school = e.target.value;
-                            setResume((r) => ({ ...r, education: newEdu }));
-                            markTyping();
-                          }}
-                        />
-                      </div>
+                    onChange={(e) => {
+                      const newEdu = [...resume.education];
+                      newEdu[idx].school = e.target.value;
+                      setResume((r) => ({ ...r, education: newEdu }));
+                      markTyping();
+                    }}
+                  />
+                </div>
 
                       {/* Location */}
                       <div style={{ marginBottom: 16 }}>
-                        <label style={S.label}>Location *</label>
-                        <input
-                          placeholder="New York, NY"
-                          style={S.input}
-                          value={edu.location || ""}
-                          onChange={(e) => {
-                            const newEdu = [...resume.education];
-                            newEdu[idx].location = e.target.value;
-                            setResume((r) => ({ ...r, education: newEdu }));
-                            markTyping();
-                          }}
+                  <label style={S.label}>Location *</label>
+                  <input
+                    placeholder="New York, NY"
+                    style={S.input}
+                    value={edu.location || ""}
+                    onChange={(e) => {
+                      const newEdu = [...resume.education];
+                      newEdu[idx].location = e.target.value;
+                      setResume((r) => ({ ...r, education: newEdu }));
+                      markTyping();
+                    }}
                         />
                         <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
-                          Location is required for education
-                        </div>
-                      </div>
+                    Location is required for education
+                  </div>
+                </div>
 
                       {/* Dates - Now using consistent S.input style instead of thick blue border */}
                       <div style={{ ...S.grid2, marginBottom: 16 }}>
-                        <div>
-                          <label style={S.label}>
+                  <div>
+                    <label style={S.label}>
                             <CalendarDots size={18} color="#3b82f6" style={{ verticalAlign: "middle", marginRight: "6px" }} />
                             Start Date
                             <span style={{ fontSize: 11, color: "#64748b" }}> (MM/DD/YYYY)</span>
-                          </label>
-                          <input
-                            type="date"
+                    </label>
+                    <input
+                      type="date"
                             style={S.input}  // Changed from S.dateInput → now matches other inputs
                             value={edu.startDate || ""}
-                            onFocus={openNativeDatePicker}
-                            onClick={openNativeDatePicker}
-                            onChange={(e) => {
-                              const newEdu = [...resume.education];
-                              newEdu[idx].startDate = e.target.value;
-                              setResume((r) => ({ ...r, education: newEdu }));
-                              markTyping();
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label style={S.label}>
+                      onFocus={openNativeDatePicker}
+                      onClick={openNativeDatePicker}
+                      onChange={(e) => {
+                        const newEdu = [...resume.education];
+                        newEdu[idx].startDate = e.target.value;
+                        setResume((r) => ({ ...r, education: newEdu }));
+                        markTyping();
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={S.label}>
                             <CalendarDots size={18} color="#3b82f6" style={{ verticalAlign: "middle", marginRight: "6px" }} />
                             End Date / Graduation
                             <span style={{ fontSize: 11, color: "#64748b" }}> (MM/DD/YYYY)</span>
-                          </label>
-                          <input
-                            type="date"
+                    </label>
+                    <input
+                      type="date"
                             style={S.input}  // Consistent with other fields
                             value={edu.endDate || ""}
-                            onFocus={openNativeDatePicker}
-                            onClick={openNativeDatePicker}
-                            onChange={(e) => {
-                              const newEdu = [...resume.education];
-                              newEdu[idx].endDate = e.target.value;
-                              setResume((r) => ({ ...r, education: newEdu }));
-                              markTyping();
-                            }}
-                          />
-                        </div>
-                      </div>
+                      onFocus={openNativeDatePicker}
+                      onClick={openNativeDatePicker}
+                      onChange={(e) => {
+                        const newEdu = [...resume.education];
+                        newEdu[idx].endDate = e.target.value;
+                        setResume((r) => ({ ...r, education: newEdu }));
+                        markTyping();
+                      }}
+                    />
+                  </div>
+                </div>
 
                       {/* Additional Details - Now uses S.textarea consistently */}
                       <div style={{ marginBottom: 20 }}>
-                        <label style={S.label}>Additional Details</label>
-                        <textarea
+                  <label style={S.label}>Additional Details</label>
+                  <textarea
                           placeholder="Graduated with honors 
         GPA: 3.9/4.0" 
-                          style={S.textarea}
-                          value={(edu.details || []).join("\n")}
-                          onChange={(e) => {
-                            const newEdu = [...resume.education];
+                    style={S.textarea}
+                    value={(edu.details || []).join("\n")}
+                    onChange={(e) => {
+                      const newEdu = [...resume.education];
                             newEdu[idx].details = e.target.value.split("\n").filter(line => line.trim());
-                            setResume((r) => ({ ...r, education: newEdu }));
-                            markTyping();
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                      setResume((r) => ({ ...r, education: newEdu }));
+                      markTyping();
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
                 </div>
               ) : (
                 <div
@@ -7343,76 +7347,76 @@ export default function Builder() {
                   flexWrap: "wrap",
                 }}
               >
-                <button
-                  type="button"
+            <button
+              type="button"
                   style={{
                     ...S.btnGhost,
                     padding: "10px 16px",
                     fontSize: "14px",
                   }}
-                  onClick={() =>
-                    setResume((r) => ({
-                      ...r,
-                      education: [
-                        ...r.education,
-                        {
-                          degree: "",
-                          school: "",
-                          location: "",
-                          startDate: "",
-                          endDate: "",
-                          details: [],
-                        },
-                      ],
-                    }))
+              onClick={() =>
+                setResume((r) => ({
+                  ...r,
+                  education: [
+                    ...r.education,
+                    {
+                      degree: "",
+                      school: "",
+                      location: "",
+                      startDate: "",
+                      endDate: "",
+                      details: [],
+                    },
+                  ],
+                }))
                   }
                 >
                   + Add Education
-                </button>
+            </button>
 
-                {resume.education.length > 1 && (
-                  <button
-                    type="button"
+            {resume.education.length > 1 && (
+              <button
+                type="button"
                     data-variant="error"
-                    style={{
-                      ...S.btnGhost,
-                      borderColor: "#fecaca",
-                      color: "#dc2626",
+                style={{
+                  ...S.btnGhost,
+                  borderColor: "#fecaca",
+                  color: "#dc2626",
                       padding: "10px 16px",
                       fontSize: "14px",
-                    }}
-                    onClick={() =>
-                      setResume((r) => ({
-                        ...r,
-                        education: r.education.slice(0, -1),
-                      }))
+                }}
+                onClick={() =>
+                  setResume((r) => ({
+                    ...r,
+                    education: r.education.slice(0, -1),
+                  }))
                     }
                   >
                     Undo
-                  </button>
-                )}
+              </button>
+            )}
 
-                {resume.education.length > 0 && (
-                  <button
-                    type="button"
+            {resume.education.length > 0 && (
+              <button
+                type="button"
                     data-variant="error"
-                    style={{
-                      ...S.btnGhost,
-                      borderColor: "#fecaca",
-                      color: "#dc2626",
+                style={{
+                  ...S.btnGhost,
+                  borderColor: "#fecaca",
+                  color: "#dc2626",
                       padding: "10px 16px",
                       fontSize: "14px",
-                    }}
-                    onClick={() =>
-                      setResume((r) => ({
-                        ...r,
-                        education: r.education.length > 1 ? [r.education[0]] : [],
-                      }))
+                }}
+                onClick={() =>
+                  setResume((r) => ({
+                    ...r,
+                    education: r.education.length > 1 ? [r.education[0]] : [],
+                  }))
                     }
                   >
                     Clear
-                  </button>
-                )}
+              </button>
+            )}
               </div>
             </section>
           </>
@@ -7431,71 +7435,71 @@ export default function Builder() {
                   boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
                 }}
               >
-                <label style={S.label}>Your Skills</label>
+              <label style={S.label}>Your Skills</label>
 
                 {/* Display existing skills as chips */}
-                <div style={S.chipRow}>
-                  {(resume.skills || [])
-                    .filter(Boolean)
-                    .map((skill, i) => {
-                      const name = typeof skill === "string" ? skill : skill?.name;
-                      if (!name) return null;
-                      const score =
-                        typeof skill === "object" && skill?.score !== undefined
-                          ? skill.score
-                          : null;
-                      return (
-                        <span
-                          key={`${name}-${i}`}
-                          style={S.chip}
-                          onClick={() => removeSkill(name)}
+              <div style={S.chipRow}>
+                {(resume.skills || [])
+                  .filter(Boolean)
+                  .map((skill, i) => {
+                    const name = typeof skill === "string" ? skill : skill?.name;
+                    if (!name) return null;
+                    const score =
+                      typeof skill === "object" && skill?.score !== undefined
+                        ? skill.score
+                        : null;
+                    return (
+                      <span
+                        key={`${name}-${i}`}
+                        style={S.chip}
+                        onClick={() => removeSkill(name)}
                           title={`Remove${score !== null ? ` (Score: ${score})` : ""}`}
                         >
-                          {name}
-                          {score !== null ? ` (${score})` : ""}
+                        {name}
+                        {score !== null ? ` (${score})` : ""}
                           <span style={{ fontWeight: 700, lineHeight: 1 }}> ×</span>
-                        </span>
-                      );
-                    })
-                    .filter(Boolean)}
-                </div>
+                      </span>
+                    );
+                  })
+                  .filter(Boolean)}
+              </div>
 
                 {/* Add new skill */}
                 <div style={{ marginTop: 20 }}>
-                  <label style={S.label}>Add a skill (press Enter to add)</label>
+                <label style={S.label}>Add a skill (press Enter to add)</label>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <input
-                      style={{ ...S.input, flex: 1 }}
-                      value={skillsInput}
+                  <input
+                    style={{ ...S.input, flex: 1 }}
+                    value={skillsInput}
                       placeholder="e.g., React, Python, Leadership"
-                      onChange={(e) => setSkillsInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          commitSkillToken();
-                          setSkillsInput("");
-                        }
-                      }}
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      style={{ ...S.input, width: "80px" }}
-                      placeholder="Score"
-                      value={skillScoreInput}
-                      onChange={(e) => setSkillScoreInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          commitSkillToken();
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
+                    onChange={(e) => setSkillsInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
                         commitSkillToken();
+                        setSkillsInput("");
+                      }
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    style={{ ...S.input, width: "80px" }}
+                    placeholder="Score"
+                    value={skillScoreInput}
+                    onChange={(e) => setSkillScoreInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitSkillToken();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      commitSkillToken();
                         setSkillsInput("");
                         setSkillScoreInput("");
                       }}
@@ -7506,12 +7510,12 @@ export default function Builder() {
                         minWidth: "80px",
                       }}
                     >
-                      Add
-                    </button>
-                  </div>
+                    Add
+                  </button>
+                </div>
                   <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
                     Optional: Add a score (0–100) if your template supports skill levels
-                  </div>
+                </div>
                 </div>
 
                 {/* AI Assistant */}
@@ -7567,8 +7571,8 @@ export default function Builder() {
                   >
                     {aiLoading ? "🔄 Generating..." : "✨ Suggest Skills"}
                   </button>
-                  </div>
                 </div>
+              </div>
 
                 {/* Empty state */}
                 {(resume.skills || []).length === 0 && (
@@ -7585,7 +7589,7 @@ export default function Builder() {
                     }}
                   >
                     No skills added yet. Start typing to add your key skills!
-                  </div>
+            </div>
                 )}
               </div>
             </section>
@@ -7594,15 +7598,15 @@ export default function Builder() {
 
         {/* STEP 6: PROJECTS */}
         {step === 6 && (
-            <>
-              {resume.projects && resume.projects.length > 0 ? (
-                resume.projects.map((proj, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      marginBottom: 24,
+          <>
+            {resume.projects && resume.projects.length > 0 ? (
+              resume.projects.map((proj, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    marginBottom: 24,
                       padding: "20px",
-                      border: "1px solid #e2e8f0",
+                    border: "1px solid #e2e8f0",
                       borderRadius: "12px",
                       background: "#fff",
                       boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
@@ -7610,35 +7614,35 @@ export default function Builder() {
                   >
                     {/* Project Name */}
                     <div style={{ marginBottom: 16 }}>
-                      <label style={S.label}>Project Name *</label>
-                      <input
-                        placeholder="E-commerce Website"
-                        style={S.input}
-                        value={proj.name || ""}
-                        onChange={(e) => {
-                          const newProjects = [...(resume.projects || [])];
+                    <label style={S.label}>Project Name *</label>
+                    <input
+                      placeholder="E-commerce Website"
+                      style={S.input}
+                      value={proj.name || ""}
+                      onChange={(e) => {
+                        const newProjects = [...(resume.projects || [])];
                           newProjects[idx] = { ...newProjects[idx], name: e.target.value };
-                          setResume((r) => ({ ...r, projects: newProjects }));
-                          markTyping();
-                        }}
-                      />
-                    </div>
+                        setResume((r) => ({ ...r, projects: newProjects }));
+                        markTyping();
+                      }}
+                    />
+                  </div>
 
                     {/* Description */}
                     <div style={{ marginBottom: 16 }}>
-                      <label style={S.label}>Description</label>
-                      <textarea
-                        placeholder="Describe the project, technologies used, and your role..."
+                    <label style={S.label}>Description</label>
+                    <textarea
+                      placeholder="Describe the project, technologies used, and your role..."
                         style={{ ...S.textarea, minHeight: 100 }}
-                        value={proj.description || ""}
-                        onChange={(e) => {
-                          const newProjects = [...(resume.projects || [])];
+                      value={proj.description || ""}
+                      onChange={(e) => {
+                        const newProjects = [...(resume.projects || [])];
                           newProjects[idx] = { ...newProjects[idx], description: e.target.value };
-                          setResume((r) => ({ ...r, projects: newProjects }));
-                          markTyping();
-                        }}
-                      />
-                    </div>
+                        setResume((r) => ({ ...r, projects: newProjects }));
+                        markTyping();
+                      }}
+                    />
+                  </div>
 
                     {/* AI Assistant - Clean, form-integrated style (no blue bg) */}
                     <div style={{ marginBottom: 16 }}>
@@ -7647,18 +7651,18 @@ export default function Builder() {
                       </div>
 
                       {/* Input field - full width */}
-                      <input
+                  <input
                         placeholder="Paste job description or describe target role for AI suggestions..."
                         style={{ ...S.input, width: "100%", marginBottom: 10 }}
-                        value={jobDescription}
-                        onChange={(e) => setJobDescription(e.target.value)}
-                      />
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                  />
 
                       {/* Button - now directly below the input */}
                       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 2 }}>
-                      <button
-                        type="button"
-                        style={{
+                  <button
+                    type="button"
+                    style={{
                           ...S.btnGhost,
                           width: "fit-content",
                           padding: "8px 14px",
@@ -7667,74 +7671,74 @@ export default function Builder() {
                           color: aiLoading ? "#94a3b8" : "#2563eb",
                           borderColor: aiLoading ? "#cbd5e1" : "#93c5fd",
                           justifyContent: "center",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                        disabled={aiLoading}
-                        onClick={() =>
-                          generateAiForField(
-                            "projectDescription",
-                            (text) => {
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                    disabled={aiLoading}
+                    onClick={() =>
+                      generateAiForField(
+                        "projectDescription",
+                        (text) => {
                               const newProjects = [...resume.projects];
                               newProjects[idx].description = text;
-                              setResume((r) => ({ ...r, projects: newProjects }));
-                              markTyping();
-                            },
+                          setResume((r) => ({ ...r, projects: newProjects }));
+                          markTyping();
+                        },
                             "AI description applied!"
-                          )
+                      )
                         }
                       >
                         {aiLoading ? "🔄 Generating..." : "✨ Suggest Description"}
-                      </button>
-                      </div>
+                  </button>
+                </div>
                     </div>
 
                     {/* Link */}
                     <div style={{ marginBottom: 20 }}>
-                      <label style={S.label}>Link</label>
-                      <input
-                        placeholder="https://project-url.com"
-                        style={S.input}
-                        value={proj.link || ""}
-                        onChange={(e) => {
-                          const newProjects = [...(resume.projects || [])];
+                    <label style={S.label}>Link</label>
+                    <input
+                      placeholder="https://project-url.com"
+                      style={S.input}
+                      value={proj.link || ""}
+                      onChange={(e) => {
+                        const newProjects = [...(resume.projects || [])];
                           newProjects[idx] = { ...newProjects[idx], link: e.target.value };
-                          setResume((r) => ({ ...r, projects: newProjects }));
-                          markTyping();
-                        }}
-                      />
-                    </div>
+                        setResume((r) => ({ ...r, projects: newProjects }));
+                        markTyping();
+                      }}
+                    />
+                  </div>
 
                     {/* Remove Button - Position unchanged (bottom-right) */}
                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                      <button
-                        type="button"
+                  <button
+                    type="button"
                         data-variant="error"
-                        style={{
-                          ...S.btnGhost,
-                          borderColor: "#fecaca",
-                          color: "#dc2626",
+                    style={{
+                      ...S.btnGhost,
+                      borderColor: "#fecaca",
+                      color: "#dc2626",
                           padding: "8px 14px",
                           fontSize: "13px",
-                        }}
-                        onClick={() => {
+                    }}
+                    onClick={() => {
                           const newProjects = resume.projects.filter((_, i) => i !== idx);
-                          setResume((r) => ({ ...r, projects: newProjects }));
-                          markTyping();
+                      setResume((r) => ({ ...r, projects: newProjects }));
+                      markTyping();
                         }}
                       >
                         Remove
-                      </button>
+                  </button>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div
-                  style={{
-                    color: "#64748b",
-                    fontSize: "14px",
-                    marginBottom: "16px",
+                </div>
+              ))
+            ) : (
+              <div
+                style={{
+                  color: "#64748b",
+                  fontSize: "14px",
+                  marginBottom: "16px",
                     textAlign: "center",
                     padding: "32px",
                     background: "#f8fafc",
@@ -7743,41 +7747,41 @@ export default function Builder() {
                   }}
                 >
                   No projects added yet. Click "+ Add Project" to get started.
-                </div>
-              )}
+              </div>
+            )}
 
               {/* Add Project Button - Position unchanged (bottom-right) */}
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-                <button
-                  type="button"
+            <button
+              type="button"
                   style={{
                     ...S.btnGhost,
                     padding: "10px 16px",
                     fontSize: "14px",
                   }}
-                  onClick={() => {
-                    setResume((r) => ({
-                      ...r,
-                      projects: [
-                        ...(r.projects || []),
-                        { name: "", description: "", link: "" },
-                      ],
-                    }));
-                    markTyping();
+              onClick={() => {
+                setResume((r) => ({
+                  ...r,
+                  projects: [
+                    ...(r.projects || []),
+                    { name: "", description: "", link: "" },
+                  ],
+                }));
+                markTyping();
                   }}
                 >
-                  + Add Project
-                </button>
+              + Add Project
+            </button>
               </div>
-            </>
-          )}
+          </>
+        )}
 
         {/* STEP 7: HOBBIES / AWARDS */}
         {step === 7 && (
-        <>
+          <>
           <section style={{ marginBottom: 32 }}>
             <div
-              style={{
+                style={{
                 padding: "20px",
                 border: "1px solid #e2e8f0",
                 borderRadius: "12px",
@@ -7787,8 +7791,8 @@ export default function Builder() {
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                  Hobbies
-                </h3>
+                Hobbies
+              </h3>
                 <button
                   type="button"
                   style={{
@@ -7888,102 +7892,102 @@ export default function Builder() {
                 <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
                   Awards & Achievements
                 </h3>
-                <button
-                  type="button"
+              <button
+                type="button"
                   style={{
                     ...S.btnGhost,
                     padding: "10px 16px",
                     fontSize: "14px",
                   }}
-                  onClick={() => {
-                    setResume((r) => ({
-                      ...r,
+                onClick={() => {
+                  setResume((r) => ({
+                    ...r,
                       awards: [...(r.awards || []), { title: "", description: "", issuer: "" }],
-                    }));
-                    markTyping();
+                  }));
+                  markTyping();
                   }}
                 >
                   + Add Award
-                </button>
-              </div>
+              </button>
+            </div>
 
               {resume.awards && resume.awards.length > 0 ? (
                 <div style={{ display: "grid", gap: 20 }}>
                   {resume.awards.map((award, idx) => (
-                    <div
-                      key={idx}
-                      style={{
+                  <div
+                    key={idx}
+                    style={{
                         padding: "20px",
-                        border: "1px solid #e2e8f0",
+                      border: "1px solid #e2e8f0",
                         borderRadius: "12px",
                         background: "#fff",
                         boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
                       }}
                     >
                       <div style={{ marginBottom: 16 }}>
-                        <label style={S.label}>Title *</label>
-                        <input
+                      <label style={S.label}>Title *</label>
+                      <input
                           placeholder="e.g., Employee of the Year 2024"
-                          style={S.input}
-                          value={award.title || ""}
-                          onChange={(e) => {
+                        style={S.input}
+                        value={award.title || ""}
+                        onChange={(e) => {
                             const newAwards = [...resume.awards];
                             newAwards[idx].title = e.target.value;
-                            setResume((r) => ({ ...r, awards: newAwards }));
-                            markTyping();
-                          }}
-                        />
-                      </div>
+                          setResume((r) => ({ ...r, awards: newAwards }));
+                          markTyping();
+                        }}
+                      />
+                    </div>
 
                       <div style={{ marginBottom: 16 }}>
-                        <label style={S.label}>Description</label>
-                        <textarea
+                      <label style={S.label}>Description</label>
+                      <textarea
                           placeholder="Briefly describe the award and your achievement..."
                           style={{ ...S.textarea, minHeight: 100 }}
-                          value={award.description || ""}
-                          onChange={(e) => {
+                        value={award.description || ""}
+                        onChange={(e) => {
                             const newAwards = [...resume.awards];
                             newAwards[idx].description = e.target.value;
-                            setResume((r) => ({ ...r, awards: newAwards }));
-                            markTyping();
-                          }}
-                        />
-                      </div>
+                          setResume((r) => ({ ...r, awards: newAwards }));
+                          markTyping();
+                        }}
+                      />
+                    </div>
 
                       <div style={{ marginBottom: 20 }}>
                         <label style={S.label}>Issuer / Organization</label>
-                        <input
+                      <input
                           placeholder="e.g., TechCorp Inc., Google"
-                          style={S.input}
-                          value={award.issuer || ""}
-                          onChange={(e) => {
+                        style={S.input}
+                        value={award.issuer || ""}
+                        onChange={(e) => {
                             const newAwards = [...resume.awards];
                             newAwards[idx].issuer = e.target.value;
-                            setResume((r) => ({ ...r, awards: newAwards }));
-                            markTyping();
-                          }}
-                        />
-                      </div>
+                          setResume((r) => ({ ...r, awards: newAwards }));
+                          markTyping();
+                        }}
+                      />
+                    </div>
 
                       <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                        <button
-                          type="button"
+                    <button
+                      type="button"
                           data-variant="error"
-                          style={{
-                            ...S.btnGhost,
-                            borderColor: "#fecaca",
-                            color: "#dc2626",
+                      style={{
+                        ...S.btnGhost,
+                        borderColor: "#fecaca",
+                        color: "#dc2626",
                             padding: "8px 16px",
-                          }}
-                          onClick={() => {
+                      }}
+                      onClick={() => {
                             const newAwards = resume.awards.filter((_, i) => i !== idx);
-                            setResume((r) => ({ ...r, awards: newAwards }));
-                            markTyping();
+                        setResume((r) => ({ ...r, awards: newAwards }));
+                        markTyping();
                           }}
                         >
-                          Remove Award
-                        </button>
-                      </div>
+                      Remove Award
+                    </button>
+                  </div>
                     </div>
                   ))}
                 </div>
@@ -8004,8 +8008,8 @@ export default function Builder() {
               )}
             </div>
           </section>
-        </>
-      )}
+          </>
+        )}
 
         {/* STEP 2: SUMMARY */}
         {step === 2 && (
@@ -8021,74 +8025,74 @@ export default function Builder() {
                   marginBottom: 24,
                 }}
               >
-                <label style={S.label}>
+              <label style={S.label}>
                   Professional Summary
-                  <span style={{ fontSize: 11, color: "#64748b", marginLeft: 8 }}>
+                <span style={{ fontSize: 11, color: "#64748b", marginLeft: 8 }}>
                     (Edit anywhere, add bullets with • Insert Bullet)
-                  </span>
-                </label>
+                </span>
+              </label>
 
-                <RichTextEditor
-                  value={
-                    resume.contact.summary ||
-                    resume.contact.professionalSummary ||
-                    ""
-                  }
-                  onChange={(html) => {
-                    setResume((r) => ({
-                      ...r,
-                      contact: {
-                        ...r.contact,
-                        summary: html,
-                        professionalSummary: html,
-                      },
-                    }));
-                    markTyping();
-                  }}
+              <RichTextEditor
+                value={
+                  resume.contact.summary ||
+                  resume.contact.professionalSummary ||
+                  ""
+                }
+                onChange={(html) => {
+                  setResume((r) => ({
+                    ...r,
+                    contact: {
+                      ...r.contact,
+                      summary: html,
+                      professionalSummary: html,
+                    },
+                  }));
+                  markTyping();
+                }}
                   placeholder="Write a compelling professional summary that highlights your experience, skills, and career goals..."
                   minHeight={160}
                 />
 
                 {/* Clear Summary Button */}
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-                  <button
-                    type="button"
+                <button
+                  type="button"
                     data-variant="error"
-                    style={{
-                      ...S.btnGhost,
-                      borderColor: "#fecaca",
-                      color: "#dc2626",
+                  style={{
+                    ...S.btnGhost,
+                    borderColor: "#fecaca",
+                    color: "#dc2626",
                       padding: "8px 14px",
                       fontSize: "13px",
-                    }}
-                    onClick={() => {
-                      setResume((r) => ({
-                        ...r,
-                        contact: {
-                          ...r.contact,
-                          summary: "",
-                          professionalSummary: "",
-                        },
-                      }));
-                      markTyping();
+                  }}
+                  onClick={() => {
+                    setResume((r) => ({
+                      ...r,
+                      contact: {
+                        ...r.contact,
+                        summary: "",
+                        professionalSummary: "",
+                      },
+                    }));
+                    markTyping();
                     }}
                   >
-                    Clear Summary
-                  </button>
-                </div>
+                  Clear Summary
+                </button>
+            </div>
 
                 {/* AI Assistant */}
                 <div style={{ marginTop: 20 }}>
                   <div style={{ fontSize: "13px", fontWeight: 600, color: "#1e40af", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
                     <span>🤖</span> AI Assistant
-                  </div>
+              </div>
 
                   {/* Input field - full width */}
-                  <input
+              <input
                     placeholder="Paste job description or describe your target role for AI suggestions..."
                     style={{ ...S.input, width: "100%", marginBottom: 10 }}
-                    value={jobDescription}
-                    onChange={(e) => setJobDescription(e.target.value)}
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !aiLoading) {
                         e.preventDefault();
@@ -8098,9 +8102,9 @@ export default function Builder() {
                   />
 
                   <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 2 }}>
-                  <button
-                  type="button"
-                  style={{
+              <button
+                type="button"
+                style={{
                     ...S.btnGhost,
                     width: "fit-content",
                     margin: "0", // centers it
@@ -8110,17 +8114,17 @@ export default function Builder() {
                     borderColor: aiLoading ? "#cbd5e1" : "#93c5fd",
                   }}
                   disabled={aiLoading}
-                  onClick={generateSummary}
+                onClick={generateSummary}
                 >
                   {aiLoading ? "🔄 Generating..." : "✨ Generate Summary"}
-                </button>
+              </button>
                 </div>
                 </div>
 
                 {/* Empty hint */}
                 {(!resume.contact.summary && !resume.contact.professionalSummary) && (
-                  <div
-                    style={{
+                <div
+                  style={{
                       marginTop: 24,
                       padding: "20px",
                       textAlign: "center",
@@ -8133,9 +8137,9 @@ export default function Builder() {
                   >
                     No summary yet.<br />
                     Write one above or use the AI Assistant to get started!
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
             </section>
           </>
         )}
@@ -8827,7 +8831,7 @@ function CompletionModal({
       transition: "all 0.2s",
     },
     body: { 
-      flex: 1, 
+      flex: 1,
       display: "flex", 
       overflow: "hidden",
       minHeight: 0,
@@ -8879,78 +8883,78 @@ function CompletionModal({
         <div style={modalStyles.body}>
           <div style={modalStyles.leftPanel}>
             <div style={{ flex: 1, overflowY: "auto", paddingRight: 8 }}>
-              <h3 style={S.sectionTitle}>Contact Information</h3>
-              <div style={S.grid2}>
-                <div>
+            <h3 style={S.sectionTitle}>Contact Information</h3>
+            <div style={S.grid2}>
+              <div>
                   <span style={S.label}>Name</span>
-                  <p>{resume.contact.fullName}</p>
-                </div>
-                <div>
+                <p>{resume.contact.fullName}</p>
+              </div>
+              <div>
                   <span style={S.label}>Email</span>
-                  <p>{resume.contact.email}</p>
-                </div>
-                <div>
+                <p>{resume.contact.email}</p>
+              </div>
+              <div>
                   <span style={S.label}>Phone</span>
-                  <p>{resume.contact.phone}</p>
-                </div>
-                <div>
+                <p>{resume.contact.phone}</p>
+              </div>
+              <div>
                   <span style={S.label}>Location</span>
-                  <p>{resume.contact.address}</p>
-                </div>
-                <div>
+                <p>{resume.contact.address}</p>
+              </div>
+              <div>
                   <span style={S.label}>Website</span>
                   <p>{resume.contact.website || "-"}</p>
-                </div>
-                <div>
+              </div>
+              <div>
                   <span style={S.label}>Headline</span>
                   <p>{resume.contact.headline || "-"}</p>
-                </div>
               </div>
+            </div>
 
-              <h3 style={S.sectionTitle}>Experience</h3>
-              {resume.experience.map((exp, idx) => (
+            <h3 style={S.sectionTitle}>Experience</h3>
+            {resume.experience.map((exp, idx) => (
                 <div key={idx} style={{ marginBottom: 16 }}>
                   <p style={{ fontWeight: 600, margin: "0 0 4px" }}>
                     {exp.title || "Job Title"} <span style={{ color: THEME.sub }}>at {exp.company || "Company"}</span>
-                  </p>
-                  <p style={S.small}>
+                </p>
+                <p style={S.small}>
                     {formatDate(exp.startDate)} – {exp.current ? "Present" : formatDate(exp.endDate)}
                   </p>
                   <ul style={{ margin: "8px 0 0 20px", fontSize: 13, lineHeight: "1.5" }}>
                     {exp.bullets.map((bullet, i) => (
                       <li key={i}>{bullet}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                  ))}
+                </ul>
+              </div>
+            ))}
 
-              <h3 style={S.sectionTitle}>Education</h3>
-              {resume.education.map((edu, idx) => (
+            <h3 style={S.sectionTitle}>Education</h3>
+            {resume.education.map((edu, idx) => (
                 <div key={idx} style={{ marginBottom: 16 }}>
                   <p style={{ fontWeight: 600 }}>
                     {edu.degree} in {edu.field || ""} — {edu.school}
-                  </p>
-                  <p style={S.small}>
+                </p>
+                <p style={S.small}>
                     {formatDate(edu.startDate)} – {edu.endDate ? formatDate(edu.endDate) : "Expected Graduation"}
                     {edu.location ? ` • ${edu.location}` : ""}
                   </p>
                   {edu.details.length > 0 && (
                     <ul style={{ margin: "8px 0 0 20px", fontSize: 13 }}>
                       {edu.details.map((d, i) => <li key={i}>{d}</li>)}
-                    </ul>
+                </ul>
                   )}
-                </div>
-              ))}
-
-              <h3 style={S.sectionTitle}>Skills</h3>
-              <div style={S.chipRow}>
-                {resume.skills.map((skill, idx) => (
-                  <span key={idx} style={S.chip}>
-                    {typeof skill === "string" ? skill : skill.name}
-                  </span>
-                ))}
               </div>
+            ))}
+
+            <h3 style={S.sectionTitle}>Skills</h3>
+            <div style={S.chipRow}>
+              {resume.skills.map((skill, idx) => (
+                <span key={idx} style={S.chip}>
+                    {typeof skill === "string" ? skill : skill.name}
+                </span>
+              ))}
             </div>
+          </div>
 
             {/* Buttons moved here, sticky at bottom of left panel */}
             <div style={modalStyles.footerButtons}>
@@ -9022,7 +9026,7 @@ function CompletionModal({
             </div>
           </div>
         </div>
-      </div>
+        </div>
     </div>
   );
 }

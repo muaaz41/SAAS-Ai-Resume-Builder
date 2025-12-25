@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { api } from "../lib/api.js";
 import { useNavigate } from "react-router-dom";
+import { FileText } from "@phosphor-icons/react";
 
 export default function ResumeUpload({ onClose, selectedTemplateSlug }) {
 const navigate = useNavigate();
@@ -371,7 +372,7 @@ onDragLeave={handleDrag}
 onDragOver={handleDrag}
 onDrop={handleDrop}
 onClick={() => document.getElementById("fileInput").click()}>
-<div style={S.icon}>📄</div>
+<div style={S.icon}><FileText size={48} weight="regular" /></div>
 <div style={S.text}>
 Drag & drop your resume here, or click to browse
 </div>
@@ -395,7 +396,7 @@ e.target.files[0] && handleFileSelect(e.target.files[0])
 ) : (
 <>
 <div style={S.fileInfo}>
-<div style={S.fileName}>📄 {file.name}</div>
+<div style={S.fileName}><FileText size={16} weight="regular" style={{ display: "inline-block", marginRight: 8, verticalAlign: "middle" }} /> {file.name}</div>
 <button
 data-variant="error"
 style={S.removeBtn}

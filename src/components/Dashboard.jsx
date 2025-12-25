@@ -2113,7 +2113,8 @@ import ResumeUpload from "./ResumeUpload.jsx";
 import TemplateCard from "./TemplateCard.jsx";
 import { showToast } from "../lib/toast";
 import { Clock } from 'lucide-react';
-import { HandWaving, MagnifyingGlass, MagnifyingGlassIcon, ReadCvLogo, Sparkle, TrayArrowUp, UploadIcon } from "@phosphor-icons/react";
+import { HandWaving, MagnifyingGlass, MagnifyingGlassIcon, ReadCvLogo, Sparkle, TrayArrowUp, UploadIcon, FileText } from "@phosphor-icons/react";
+import { showAlert, showConfirm } from "../lib/alert.js";
 
 const HIDDEN_TEMPLATE_NAMES = new Set([
   // "Modern Flat",
@@ -2307,7 +2308,8 @@ export default function Dashboard() {
   }, [templates, search]);
 
   const handleDeleteResume = async (resumeId) => {
-    if (!window.confirm("Are you sure you want to delete this resume?")) return;
+    const confirmed = await showConfirm("Are you sure you want to delete this resume?");
+    if (!confirmed) return;
     setDeleting(resumeId);
     try {
       await api.delete(`/api/v1/resumes/${resumeId}`);
@@ -2353,7 +2355,7 @@ export default function Dashboard() {
   const handlePreviewResume = async (resumeId) => {
     if (!resumeId) {
       console.error("❌ No resume ID provided");
-      alert("Invalid resume ID. Please try again.");
+      await showAlert("Invalid resume ID. Please try again.");
       return;
     }
 
@@ -2366,11 +2368,11 @@ export default function Dashboard() {
         resumeRes = await api.get(`/api/v1/resumes/${resumeId}`);
       } catch (err) {
         if (err.response?.status === 404) {
-          alert("Resume not found. It may have been deleted.");
+          await showAlert("Resume not found. It may have been deleted.");
           return;
         }
         if (err.response?.status === 403) {
-          alert("You don't have permission to view this resume.");
+          await showAlert("You don't have permission to view this resume.");
           return;
         }
         throw err;
@@ -2378,7 +2380,7 @@ export default function Dashboard() {
 
       const resumeData = resumeRes.data?.data?.resume || resumeRes.data?.data;
       if (!resumeData) {
-        alert("Resume data not found. Please try again.");
+        await showAlert("Resume data not found. Please try again.");
         return;
       }
 
@@ -2391,7 +2393,7 @@ export default function Dashboard() {
       } catch (err) {
         console.warn("Server preview failed:", err);
         if (err.response?.status === 404) {
-          alert(
+          await showAlert(
             "Resume preview not available. The resume may not have a template assigned."
           );
           return;
@@ -2425,7 +2427,7 @@ export default function Dashboard() {
       console.error("❌ Failed to preview resume:", error);
       const errorMessage =
         error.response?.data?.message || error.message || "Unknown error";
-      alert(
+      await showAlert(
         `Failed to load resume preview: ${errorMessage}\n\nPlease try again or contact support if the issue persists.`
       );
     } finally {
@@ -2473,14 +2475,14 @@ export default function Dashboard() {
 
       // Show specific message for premium template access
       if (error.response?.status === 402) {
-        const shouldUpgrade = window.confirm(
+        const shouldUpgrade = await showConfirm(
           `${errorMessage}\n\nWould you like to upgrade to Premium to access this template?`
         );
         if (shouldUpgrade) {
           navigate("/pricing");
         }
       } else {
-        alert(errorMessage);
+        await showAlert(errorMessage);
       }
     }
   };
@@ -2961,7 +2963,7 @@ export default function Dashboard() {
                   position: "relative",
                   zIndex: 1,
                 }}>
-                📄
+                <FileText size={32} weight="regular" />
               </div>
               <h3
                 style={{
@@ -3446,7 +3448,7 @@ export default function Dashboard() {
               border: "1px solid #e2e8f0",
             }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 20 }}>📄</span>
+              <FileText size={20} weight="regular" />
               <div>
                 <div
                   style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>

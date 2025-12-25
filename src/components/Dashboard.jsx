@@ -2189,6 +2189,13 @@ export default function Dashboard() {
         muted: "#64748b",
     border: "#d0d7e3",
         inputBg: "#ffffff",
+        pageBg: "#f8fafc",
+        cardBg: "#ffffff",
+        primary: "#2563eb",
+        primaryHover: "#1d4ed8",
+        success: "#059669",
+        warning: "#d97706",
+        error: "#dc2626",
       };
 
   const formatPlanName = (plan) =>
@@ -2493,7 +2500,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{ position: "relative", background: "#f2f4f7", minHeight: "100vh" }}>
+    <div style={{ position: "relative", background: THEME.pageBg, minHeight: "100vh" }}>
       <Navbar />
       {showUpload && (
         <ResumeUpload
@@ -2588,8 +2595,18 @@ export default function Dashboard() {
         </div>
       )} */}
 
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
-        <style>{`#template-search::placeholder{color:${THEME.muted}}`}</style>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px", background: THEME.pageBg, minHeight: "calc(100vh - 80px)" }}>
+        <style>{`
+          #template-search::placeholder{color:${THEME.muted}}
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
 
         {subscriptionStatus && (
         <div
@@ -2926,13 +2943,29 @@ export default function Dashboard() {
           {loading ? (
             <div
               style={{
-                padding: "48px 32px",
-                background: "#f8fafc",
-                borderRadius: 16,
+                padding: "60px 40px",
+                background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+                borderRadius: 20,
                 border: "1px solid #e2e8f0",
-                color: "#475569",
+                textAlign: "center",
               }}>
-              Loading your resumes…
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: "50%",
+                  border: "4px solid #e5e7eb",
+                  borderTopColor: THEME.primary,
+                  margin: "0 auto 16px",
+                  animation: "spin 0.9s linear infinite",
+                }}
+              />
+              <div style={{ fontSize: 16, fontWeight: 600, color: THEME.text, marginBottom: 6 }}>
+                Loading your resumes…
+              </div>
+              <div style={{ fontSize: 14, color: THEME.sub }}>
+                Please wait a moment
+              </div>
             </div>
           ) : resumes.length === 0 ? (
             <div
@@ -3510,9 +3543,10 @@ export default function Dashboard() {
                   key={i}
                   style={{
                     height: 400,
-                    background: "#f1f5f9",
-                    borderRadius: 16,
-                    animation: "pulse 2s infinite",
+                    background: "linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)",
+                    borderRadius: 20,
+                    border: "1px solid #e2e8f0",
+                    animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
                   }}
                 />
               ))}
@@ -3526,18 +3560,18 @@ export default function Dashboard() {
                 borderRadius: 16,
                 border: "1px solid #e2e8f0",
               }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+              <div style={{ fontSize: 64, marginBottom: 20, opacity: 0.6 }}>🔍</div>
               <h3
                 style={{
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: "#0f172a",
-                  marginBottom: 8,
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: THEME.text,
+                  marginBottom: 10,
                 }}>
                 No templates found
               </h3>
-              <p style={{ fontSize: 14, color: "#64748b", marginBottom: 16 }}>
-                Try adjusting your search or filter criteria
+              <p style={{ fontSize: 15, color: THEME.sub, marginBottom: 24, maxWidth: 400, margin: "0 auto 24px" }}>
+                Try adjusting your search or filter criteria to find the perfect template
               </p>
               <button
                 onClick={() => {
@@ -3545,13 +3579,24 @@ export default function Dashboard() {
                   setCategory("all");
                 }}
                 style={{
-                  padding: "10px 20px",
-                  background: "#2563eb",
+                  padding: "12px 24px",
+                  background: `linear-gradient(135deg, ${THEME.primary} 0%, ${THEME.primaryHover} 100%)`,
                   color: "white",
                   border: "none",
-                  borderRadius: 8,
+                  borderRadius: 12,
                   fontWeight: 600,
                   cursor: "pointer",
+                  fontSize: 14,
+                  boxShadow: `0 4px 12px ${THEME.primary}30`,
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = `0 6px 16px ${THEME.primary}40`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = `0 4px 12px ${THEME.primary}30`;
                 }}>
                 Clear Filters
               </button>

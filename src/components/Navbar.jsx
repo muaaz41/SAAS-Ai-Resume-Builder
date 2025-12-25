@@ -36,9 +36,8 @@ const Navbar = () => {
         <div className="nav-cta">
           {token ? (
             <>
-              <span
-                style={{ alignSelf: "center", fontSize: 12, color: "#334155" }}>
-                {user?.email}
+              <span title={user?.email}>
+                {user?.email?.length > 20 ? `${user?.email?.substring(0, 20)}...` : user?.email}
               </span>
               <Link
                 className="btn-solid"
@@ -52,18 +51,22 @@ const Navbar = () => {
             </>
           ) : (
             <>
+              <Link className="btn-outline" to="/signin">
+                Login
+              </Link>
               <Link className="btn-solid" to="/signup">
                 Sign Up
-              </Link>
-              <Link className="btn-solid" to="/signin">
-                Login
               </Link>
             </>
           )}
         </div>
 
         {/* Mobile Menu Button */}
-        <button className="mobile-menu-btn" onClick={toggleMobileMenu}>
+        <button 
+          className={`mobile-menu-btn ${isMobileMenuOpen ? "open" : ""}`}
+          onClick={toggleMobileMenu}
+          aria-label="Toggle mobile menu"
+          aria-expanded={isMobileMenuOpen}>
           <span></span>
           <span></span>
           <span></span>

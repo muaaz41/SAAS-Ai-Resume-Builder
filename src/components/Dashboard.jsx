@@ -2168,6 +2168,7 @@ export default function Dashboard() {
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const toastShownRef = useRef(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -3447,7 +3448,7 @@ export default function Dashboard() {
                   <MagnifyingGlassIcon size={16} weight="duotone" color="#2563eb"/>
                 </span>
               </div>
-              <select
+              {/* <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 style={{
@@ -3465,7 +3466,155 @@ export default function Dashboard() {
                 <option value="all">All Templates</option>
                 <option value="free">Free Templates</option>
                 <option value="premium">Premium Templates</option>
-              </select>
+              </select> */}
+              {/* Custom Template Filter Dropdown */}
+              <div style={{ position: "relative", minWidth: 180 }}>
+                {/* Dropdown Trigger Button */}
+                <button
+                  onClick={() => setIsOpen(!isOpen)}
+                  style={{
+                    width: "100%",
+                    padding: "12px 16px",
+                    background: THEME.inputBg,
+                    border: `1px solid ${THEME.border}`,
+                    borderRadius: 12,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: THEME.text,
+                    textAlign: "left",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    transition: "border-color 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#a8b5c8")}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = THEME.border)}
+                >
+                  <span>
+                    {category === "all" && `All Templates (${templates.length})`}
+                    {category === "free" && `Free Templates (${templates.filter(t => t.category === "free").length})`}
+                    {category === "premium" && `Premium Templates (${templates.filter(t => t.category === "premium" || t.category === "industry").length})`}
+                  </span>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    style={{
+                      color: THEME.muted,
+                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.2s ease",
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu - Only visible when open */}
+                {isOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      marginTop: 8,
+                      background: THEME.cardBg,
+                      border: `1px solid ${THEME.border}`,
+                      borderRadius: 12,
+                      boxShadow: "0 8px 25px rgba(15, 23, 42, 0.1)",
+                      overflow: "hidden",
+                      zIndex: 50,
+                    }}
+                  >
+                    <button
+                      onClick={() => {
+                        setCategory("all");
+                        setIsOpen(false); // Close after selection
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "12px 16px",
+                        background: category === "all" ? "#f0f9ff" : "transparent",
+                        color: category === "all" ? THEME.primary : THEME.text,
+                        fontSize: 14,
+                        fontWeight: category === "all" ? 600 : 500,
+                        textAlign: "left",
+                        border: "none",
+                        cursor: "pointer",
+                        transition: "background 0.2s",
+                      }}
+                      onMouseEnter={(e) => category !== "all" && (e.currentTarget.style.background = "#f8fafc")}
+                      onMouseLeave={(e) => category !== "all" && (e.currentTarget.style.background = "transparent")}
+                    >
+                      All Templates ({templates.length})
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setCategory("free");
+                        setIsOpen(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "12px 16px",
+                        background: category === "free" ? "#ecfdf5" : "transparent",
+                        color: category === "free" ? "#059669" : THEME.text,
+                        fontSize: 14,
+                        fontWeight: category === "free" ? 600 : 500,
+                        textAlign: "left",
+                        border: "none",
+                        borderTop: `1px solid ${THEME.border}`,
+                        cursor: "pointer",
+                        transition: "background 0.2s",
+                      }}
+                      onMouseEnter={(e) => category !== "free" && (e.currentTarget.style.background = "#f8fafc")}
+                      onMouseLeave={(e) => category !== "free" && (e.currentTarget.style.background = "transparent")}
+                    >
+                      Free Templates ({templates.filter(t => t.category === "free").length})
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setCategory("premium");
+                        setIsOpen(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "12px 16px",
+                        background: category === "premium" ? "#fffbeb" : "transparent",
+                        color: category === "premium" ? "#d97706" : THEME.text,
+                        fontSize: 14,
+                        fontWeight: category === "premium" ? 600 : 500,
+                        textAlign: "left",
+                        border: "none",
+                        borderTop: `1px solid ${THEME.border}`,
+                        cursor: "pointer",
+                        transition: "background 0.2s",
+                      }}
+                      onMouseEnter={(e) => category !== "premium" && (e.currentTarget.style.background = "#fefce8")}
+                      onMouseLeave={(e) => category !== "premium" && (e.currentTarget.style.background = "transparent")}
+                    >
+                      Premium Templates ({templates.filter(t => t.category === "premium" || t.category === "industry").length})
+                    </button>
+                  </div>
+                )}
+
+                {/* Close when clicking outside */}
+                {isOpen && (
+                  <div
+                    style={{
+                      position: "fixed",
+                      inset: 0,
+                      zIndex: 40,
+                    }}
+                    onClick={() => setIsOpen(false)}
+                  />
+                )}
+              </div>
             </div>
           </div>
 

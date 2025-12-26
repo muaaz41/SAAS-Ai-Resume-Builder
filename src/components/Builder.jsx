@@ -5892,11 +5892,11 @@ export default function Builder() {
       document.body.removeChild(a);
 
       // Optional: open a preview tab for quick validation (won't run on TXT)
-      if (format !== "txt") {
-        const previewUrl = window.URL.createObjectURL(fileBlob);
-        setTimeout(() => window.open(previewUrl, "_blank"), 0);
-        setTimeout(() => window.URL.revokeObjectURL(previewUrl), 10000);
-      }
+      // if (format !== "txt") {
+      //   const previewUrl = window.URL.createObjectURL(fileBlob);
+      //   setTimeout(() => window.open(previewUrl, "_blank"), 0);
+      //   setTimeout(() => window.URL.revokeObjectURL(previewUrl), 10000);
+      // }
       showToast(`Resume exported as ${format.toUpperCase()}. Redirecting…`, {
         type: "success",
         duration: 1800,

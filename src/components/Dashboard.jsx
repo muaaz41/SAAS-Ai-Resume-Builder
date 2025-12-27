@@ -2662,8 +2662,8 @@ export default function Dashboard() {
             <div style={{ flex: 1 }}>
               <div
                 style={{
-                  fontSize: 20,
-                  fontWeight: 700,
+                  fontSize: "var(--font-size-lg)",
+                  fontWeight: "var(--font-weight-bold)",
                   color: THEME.text,
                   marginBottom: 6,
                 }}>
@@ -2673,7 +2673,7 @@ export default function Dashboard() {
               </div>
               <div
                 style={{
-                  fontSize: 14,
+                  fontSize: "var(--font-size-sm)",
                   color: THEME.sub,
                   display: "flex",
                   alignItems: "center",
@@ -2723,9 +2723,9 @@ export default function Dashboard() {
                 border: "none",
                 borderRadius: 12,
                 padding: "12px 24px",
-                fontWeight: 600,
+                fontWeight: "var(--font-weight-semibold)",
                 cursor: "pointer",
-                fontSize: 14,
+                fontSize: "var(--font-size-sm)",
                 boxShadow: subscriptionStatus.hasActiveSubscription
                   ? `0 4px 12px ${planAccent(subscriptionStatus.plan || "free")}40`
                   : "0 4px 12px rgba(37, 99, 235, 0.3)",
@@ -2760,8 +2760,8 @@ export default function Dashboard() {
           <div>
             <h1
               style={{
-                fontSize: 32,
-                fontWeight: 700,
+                fontSize: "var(--font-size-4xl)",
+                fontWeight: "var(--font-weight-bold)",
                 margin: "0 0 8px 0",
                 color: "#0f172a",
                 background: "linear-gradient(135deg, #0f172a 0%, #475569 100%)",
@@ -2784,10 +2784,10 @@ export default function Dashboard() {
             </h1>
             <p
               style={{
-                fontSize: 16,
+                fontSize: "var(--font-size-base)",
                 color: "#64748b",
                 margin: 0,
-                fontWeight: 400,
+                fontWeight: "var(--font-weight-regular)",
               }}>
               Manage your resumes and create professional documents
             </p>
@@ -2813,9 +2813,9 @@ export default function Dashboard() {
               border: "none",
                 borderRadius: 12,
                 padding: "12px 20px",
-              fontWeight: 600,
+              fontWeight: "var(--font-weight-semibold)",
               cursor: resumes.length >= 5 ? "not-allowed" : "pointer",
-              fontSize: 14,
+              fontSize: "var(--font-size-sm)",
               display: "flex",
               alignItems: "center",
               gap: 8,
@@ -2849,9 +2849,9 @@ export default function Dashboard() {
                 border: "1px solid #fecaca",
                 borderRadius: 12,
                 padding: "12px 16px",
-                fontWeight: 600,
+                fontWeight: "var(--font-weight-semibold)",
                 cursor: "pointer",
-                fontSize: 13,
+                fontSize: "var(--font-size-xs)",
                 transition: "all 0.2s ease",
               }}
               onMouseEnter={(e) => {
@@ -2879,8 +2879,8 @@ export default function Dashboard() {
             <div style={{ flex: 1 }}>
               <h2
                 style={{
-                  fontSize: 24,
-                  fontWeight: 700,
+                  fontSize: "var(--font-size-2xl)",
+                  fontWeight: "var(--font-weight-bold)",
                   margin: "0 0 6px 0",
                   color: "#0f172a",
                 }}>
@@ -2889,7 +2889,7 @@ export default function Dashboard() {
               </h2>
               <p
                 style={{
-                  fontSize: 14,
+                  fontSize: "var(--font-size-sm)",
                   color: "#64748b",
                   margin: 0,
                 }}>
@@ -2907,7 +2907,7 @@ export default function Dashboard() {
                     background: "#fef3c7",
                     border: "1px solid #fcd34d",
                     borderRadius: 8,
-                    fontSize: 13,
+                    fontSize: "var(--font-size-xs)",
                     color: "#92400e",
                     display: "flex",
                     alignItems: "center",
@@ -2927,7 +2927,7 @@ export default function Dashboard() {
                     background: "#fee2e2",
                     border: "1px solid #fca5a5",
                     borderRadius: 8,
-                    fontSize: 13,
+                    fontSize: "var(--font-size-xs)",
                     color: "#991b1b",
                     display: "flex",
                     alignItems: "center",
@@ -2961,10 +2961,10 @@ export default function Dashboard() {
                   animation: "spin 0.9s linear infinite",
                 }}
               />
-              <div style={{ fontSize: 16, fontWeight: 600, color: THEME.text, marginBottom: 6 }}>
+              <div style={{ fontSize: "var(--font-size-base)", fontWeight: "var(--font-weight-semibold)", color: THEME.text, marginBottom: 6 }}>
                 Loading your resumes…
               </div>
-              <div style={{ fontSize: 14, color: THEME.sub }}>
+              <div style={{ fontSize: "var(--font-size-sm)", color: THEME.sub }}>
                 Please wait a moment
               </div>
             </div>
@@ -2992,7 +2992,7 @@ export default function Dashboard() {
               />
               <div
                 style={{
-                  fontSize: 64,
+                  fontSize: "var(--font-size-4xl)",
                   marginBottom: 20,
                   position: "relative",
                   zIndex: 1,
@@ -3001,8 +3001,8 @@ export default function Dashboard() {
               </div>
               <h3
                 style={{
-                  fontSize: 22,
-                  fontWeight: 700,
+                  fontSize: "var(--font-size-xl)",
+                  fontWeight: "var(--font-weight-bold)",
                   color: "#0f172a",
                   marginBottom: 12,
                   position: "relative",
@@ -3012,7 +3012,7 @@ export default function Dashboard() {
               </h3>
               <p
                 style={{
-                  fontSize: 15,
+                  fontSize: "var(--font-size-base)",
                   color: "#64748b",
                   marginBottom: 32,
                   maxWidth: 400,
@@ -3044,9 +3044,9 @@ export default function Dashboard() {
                   color: "white",
                   border: "none",
                   borderRadius: 12,
-                  fontWeight: 600,
+                  fontWeight: "var(--font-weight-semibold)",
                   cursor: resumes.length >= 5 ? "not-allowed" : "pointer",
-                  fontSize: 15,
+                  fontSize: "var(--font-size-base)",
                   boxShadow: resumes.length >= 5
                     ? "none"
                     : "0 4px 16px rgba(37, 99, 235, 0.3)",
@@ -3150,8 +3150,8 @@ export default function Dashboard() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div
                             style={{
-                              fontWeight: 700,
-                              fontSize: 18,
+                              fontWeight: "var(--font-weight-bold)",
+                              fontSize: "var(--font-size-lg)",
                               color: "#0f172a",
                               marginBottom: 4,
                               whiteSpace: "nowrap",
@@ -3162,7 +3162,7 @@ export default function Dashboard() {
                           </div>
                           <div
                             style={{
-                              fontSize: 14,
+                              fontSize: "var(--font-size-sm)",
                               color: "#64748b",
                               display: "flex",
                               alignItems: "center",
@@ -3176,8 +3176,8 @@ export default function Dashboard() {
                                   color: "#fff",
                                   padding: "3px 8px",
                                   borderRadius: "20px",
-                                  fontSize: "10px",
-                                  fontWeight: 700,
+                                  fontSize: "var(--font-size-xs)",
+                                  fontWeight: "var(--font-weight-bold)",
                                   letterSpacing: "0.05em",
                                   textTransform: "uppercase",
                                   boxShadow: "0 1px 2px rgba(245, 158, 11, 0.2)",
@@ -3196,7 +3196,7 @@ export default function Dashboard() {
                       {lastUpdated && (
                         <div
                           style={{
-                            fontSize: 12,
+                            fontSize: "var(--font-size-xs)",
                             color: "#94a3b8",
                             marginBottom: 16,
                             display: "flex",
@@ -3227,9 +3227,9 @@ export default function Dashboard() {
                             background: `linear-gradient(135deg, ${templateColor} 0%, ${templateColor}dd 100%)`,
                             color: "white",
                             border: "none",
-                            fontWeight: 600,
+                            fontWeight: "var(--font-weight-semibold)",
                             cursor: "pointer",
-                            fontSize: 13,
+                            fontSize: "var(--font-size-xs)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -3261,8 +3261,8 @@ export default function Dashboard() {
                             color: "white",
                             border: "none",
                             cursor: "pointer",
-                            fontSize: 13,
-                            fontWeight: 600,
+                            fontSize: "var(--font-size-xs)",
+                            fontWeight: "var(--font-weight-semibold)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -3296,8 +3296,8 @@ export default function Dashboard() {
                                 ? "not-allowed"
                                 : "pointer",
                             opacity: duplicating === (r._id || r.id) || resumes.length >= 5 ? 0.6 : 1,
-                            fontSize: 13,
-                            fontWeight: 600,
+                            fontSize: "var(--font-size-xs)",
+                            fontWeight: "var(--font-weight-semibold)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -3336,8 +3336,8 @@ export default function Dashboard() {
                                 ? "not-allowed"
                                 : "pointer",
                             opacity: deleting === (r._id || r.id) ? 0.6 : 1,
-                            fontSize: 13,
-                            fontWeight: 600,
+                            fontSize: "var(--font-size-xs)",
+                            fontWeight: "var(--font-weight-semibold)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -3381,8 +3381,8 @@ export default function Dashboard() {
             <div>
               <h2
                 style={{
-                  fontSize: 28,
-                  fontWeight: 700,
+                  fontSize: "var(--font-size-3xl)",
+                  fontWeight: "var(--font-weight-bold)",
                   margin: "0 0 8px 0",
                   color: THEME.text,
                 }}>
@@ -3390,7 +3390,7 @@ export default function Dashboard() {
               </h2>
               <p
                 style={{
-                  fontSize: 15,
+                  fontSize: "var(--font-size-base)",
                   color: THEME.sub,
                   margin: "0 0 4px 0",
                 }}>
@@ -3398,7 +3398,7 @@ export default function Dashboard() {
               </p>
               <p
                 style={{
-                  fontSize: 13,
+                  fontSize: "var(--font-size-xs)",
                   color: THEME.muted,
                   margin: 0,
                 }}>
@@ -3416,7 +3416,7 @@ export default function Dashboard() {
                     border: `1px solid ${THEME.border}`,
                     borderRadius: 12,
                     width: 280,
-                    fontSize: 14,
+                    fontSize: "var(--font-size-sm)",
                     background: THEME.inputBg,
                     color: THEME.text,
                     outline: "none",
@@ -3478,8 +3478,8 @@ export default function Dashboard() {
                     background: THEME.inputBg,
                     border: `1px solid ${THEME.border}`,
                     borderRadius: 12,
-                    fontSize: 14,
-                    fontWeight: 500,
+                    fontSize: "var(--font-size-sm)",
+                    fontWeight: "var(--font-weight-medium)",
                     color: THEME.text,
                     textAlign: "left",
                     cursor: "pointer",
@@ -3540,8 +3540,8 @@ export default function Dashboard() {
                         padding: "12px 16px",
                         background: category === "all" ? "#f0f9ff" : "transparent",
                         color: category === "all" ? THEME.primary : THEME.text,
-                        fontSize: 14,
-                        fontWeight: category === "all" ? 600 : 500,
+                        fontSize: "var(--font-size-sm)",
+                        fontWeight: category === "all" ? "var(--font-weight-semibold)" : "var(--font-weight-medium)",
                         textAlign: "left",
                         border: "none",
                         cursor: "pointer",
@@ -3563,8 +3563,8 @@ export default function Dashboard() {
                         padding: "12px 16px",
                         background: category === "free" ? "#ecfdf5" : "transparent",
                         color: category === "free" ? "#059669" : THEME.text,
-                        fontSize: 14,
-                        fontWeight: category === "free" ? 600 : 500,
+                        fontSize: "var(--font-size-sm)",
+                        fontWeight: category === "free" ? "var(--font-weight-semibold)" : "var(--font-weight-medium)",
                         textAlign: "left",
                         border: "none",
                         borderTop: `1px solid ${THEME.border}`,
@@ -3587,8 +3587,8 @@ export default function Dashboard() {
                         padding: "12px 16px",
                         background: category === "premium" ? "#fffbeb" : "transparent",
                         color: category === "premium" ? "#d97706" : THEME.text,
-                        fontSize: 14,
-                        fontWeight: category === "premium" ? 600 : 500,
+                        fontSize: "var(--font-size-sm)",
+                        fontWeight: category === "premium" ? "var(--font-weight-semibold)" : "var(--font-weight-medium)",
                         textAlign: "left",
                         border: "none",
                         borderTop: `1px solid ${THEME.border}`,
@@ -3709,17 +3709,17 @@ export default function Dashboard() {
                 borderRadius: 16,
                 border: "1px solid #e2e8f0",
               }}>
-              <div style={{ fontSize: 64, marginBottom: 20, opacity: 0.6 }}>🔍</div>
+              <div style={{ fontSize: "var(--font-size-4xl)", marginBottom: 20, opacity: 0.6 }}>🔍</div>
               <h3
                 style={{
-                  fontSize: 20,
-                  fontWeight: 700,
+                  fontSize: "var(--font-size-xl)",
+                  fontWeight: "var(--font-weight-bold)",
                   color: THEME.text,
                   marginBottom: 10,
                 }}>
                 No templates found
               </h3>
-              <p style={{ fontSize: 15, color: THEME.sub, marginBottom: 24, maxWidth: 400, margin: "0 auto 24px" }}>
+              <p style={{ fontSize: "var(--font-size-base)", color: THEME.sub, marginBottom: 24, maxWidth: 400, margin: "0 auto 24px" }}>
                 Try adjusting your search or filter criteria to find the perfect template
               </p>
               <button
@@ -3733,9 +3733,9 @@ export default function Dashboard() {
                   color: "white",
                   border: "none",
                   borderRadius: 12,
-                  fontWeight: 600,
+                  fontWeight: "var(--font-weight-semibold)",
                   cursor: "pointer",
-                  fontSize: 14,
+                  fontSize: "var(--font-size-sm)",
                   boxShadow: `0 4px 12px ${THEME.primary}30`,
                   transition: "all 0.2s ease",
                 }}
@@ -3998,8 +3998,8 @@ export default function Dashboard() {
             <h2
               style={{
                 margin: "0 0 8px",
-                fontSize: 20,
-                fontWeight: 700,
+                fontSize: "var(--font-size-xl)",
+                fontWeight: "var(--font-weight-bold)",
                 color: "#0f172a",
               }}>
               Delete your account?
@@ -4007,7 +4007,7 @@ export default function Dashboard() {
             <p
               style={{
                 margin: "0 0 8px",
-                fontSize: 14,
+                fontSize: "var(--font-size-sm)",
                 color: "#475569",
                 lineHeight: 1.5,
               }}>
@@ -4018,7 +4018,7 @@ export default function Dashboard() {
             <p
               style={{
                 margin: "0 0 16px",
-                fontSize: 13,
+                fontSize: "var(--font-size-xs)",
                 color: "#b91c1c",
                 lineHeight: 1.5,
               }}>
@@ -4028,7 +4028,7 @@ export default function Dashboard() {
             <p
               style={{
                 margin: "0 0 20px",
-                fontSize: 13,
+                fontSize: "var(--font-size-xs)",
                 color: "#64748b",
               }}>
               If you delete by mistake, contact support within 30 days and we may be able to help
@@ -4050,8 +4050,8 @@ export default function Dashboard() {
                   border: "1px solid #cbd5e1",
                   background: "#ffffff",
                   color: "#0f172a",
-                  fontSize: 13,
-                  fontWeight: 500,
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: "var(--font-weight-medium)",
                   cursor: deletingAccount ? "not-allowed" : "pointer",
                   opacity: deletingAccount ? 0.6 : 1,
                 }}>
@@ -4087,8 +4087,8 @@ export default function Dashboard() {
                   border: "1px solid #fecaca",
                   background: "#fee2e2",
                   color: "#b91c1c",
-                  fontSize: 13,
-                  fontWeight: 600,
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: "var(--font-weight-semibold)",
                   cursor: deletingAccount ? "not-allowed" : "pointer",
                   opacity: deletingAccount ? 0.7 : 1,
                 }}>
@@ -4355,8 +4355,8 @@ function TemplatePreviewModal({
             <h2
               style={{
                 margin: 0,
-                fontSize: "22px",
-                fontWeight: 700,
+                fontSize: "var(--font-size-xl)",
+                fontWeight: "var(--font-weight-bold)",
                 color: "#0f172a",
               }}
             >
@@ -4368,7 +4368,7 @@ function TemplatePreviewModal({
               <p
                 style={{
                   margin: "6px 0 0",
-                  fontSize: "14px",
+                  fontSize: "var(--font-size-sm)",
                   color: "#64748b",
                 }}
               >
@@ -4381,7 +4381,7 @@ function TemplatePreviewModal({
             style={{
               background: "none",
               border: "none",
-              fontSize: "32px",
+              fontSize: "var(--font-size-4xl)",
               cursor: "pointer",
               color: "#64748b",
               width: 40,
@@ -4433,7 +4433,7 @@ function TemplatePreviewModal({
                   marginBottom: 16,
                 }}
               />
-              <div style={{ fontSize: 16, fontWeight: 600 }}>
+              <div style={{ fontSize: "var(--font-size-base)", fontWeight: "var(--font-weight-semibold)" }}>
                 Loading preview...
               </div>
             </div>
@@ -4486,8 +4486,8 @@ function TemplatePreviewModal({
               border: "1px solid #cbd5e1",
               background: "#fff",
               color: "#475569",
-              fontWeight: 600,
-              fontSize: 14,
+              fontWeight: "var(--font-weight-semibold)",
+              fontSize: "var(--font-size-sm)",
               cursor: "pointer",
               transition: "all 0.2s",
             }}
@@ -4506,8 +4506,8 @@ function TemplatePreviewModal({
                 background: "#2563eb",
                 color: "#fff",
                 border: "none",
-                fontWeight: 600,
-                fontSize: 14,
+                fontWeight: "var(--font-weight-semibold)",
+                fontSize: "var(--font-size-sm)",
                 cursor: "pointer",
                 boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
                 transition: "all 0.2s",

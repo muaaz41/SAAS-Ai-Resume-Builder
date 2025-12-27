@@ -38,6 +38,8 @@
 }
 
 .hero-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(28px, 5vw, 44px);
   line-height: 1.15;
   margin: 0 0 16px;
@@ -45,6 +47,8 @@
 }
 
 .hero-subtitle {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   color: #334155;
   margin: 0 0 24px;
   max-width: 430px;
@@ -58,7 +62,9 @@
   border-radius: 10px;
   height: 48px;
   padding: 0 22px;
-  font-weight: 700;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -86,14 +92,17 @@
 }
 
 .active-title {
-  font-weight: 700;
-  font-size: 12px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
   color: #1f2937;
   width: 100%;
 }
 
 .active-sub {
-  font-size: 11px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
+  font-size: 0.6875rem; /* 11px */
   color: #64748b;
   width: 150px;
 }
@@ -154,6 +163,8 @@
 
 .welcome-title {
   white-space: pre-line;
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(36px, 6vw, 56px);
   line-height: 1;
   margin: 0 0 16px;
@@ -161,6 +172,8 @@
 }
 
 .welcome-text {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   color: #334155;
   max-width: 420px;
   margin: 12px 0 20px;
@@ -195,12 +208,16 @@
 }
 
 .mission-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(24px, 4vw, 32px);
   color: #007BFF;
   margin: 0 0 12px;
 }
 
 .mission-text {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   color: #334155;
   margin: 0 0 20px;
   font-size: clamp(14px, 2vw, 16px);
@@ -234,13 +251,16 @@
 }
 
 .section-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(24px, 4vw, 28px);
-  font-weight: 800;
   color: #0f172a;
   margin: 0 0 6px;
 }
 
 .section-sub {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   color: #64748b;
   margin: 0 0 22px;
   font-size: clamp(14px, 2vw, 16px);
@@ -285,12 +305,15 @@
 }
 
 .choose-title {
-  font-weight: 700;
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-semibold);
   color: #0f172a;
   margin-bottom: 6px;
 }
 
 .choose-text {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   color: #64748b;
   font-size: clamp(12px, 1.8vw, 14px);
   line-height: 1.5;
@@ -334,12 +357,15 @@
 }
 
 .feature-head {
-  font-weight: 800;
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   color: #0f172a;
   text-align: center;
 }
 
 .feature-text {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   color: #64748b;
   font-size: clamp(12px, 1.8vw, 14px);
   line-height: 1.55;
@@ -397,11 +423,12 @@
 }
 
 .testi-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(28px, 5vw, 44px);
   line-height: 1.2;
   color: #0f172a;
   margin: 0 0 6px;
-  font-weight: 800;
 }
 
 .testi-title .i {
@@ -474,7 +501,8 @@
 }
 
 .name {
-  font-weight: 700;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
   color: #0f172a;
 }
 
@@ -496,13 +524,16 @@
 }
 
 .templates-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(28px, 5vw, 40px);
-  font-weight: 700;
   margin: 0 0 12px;
   color: #0f172a;
 }
 
 .templates-subtitle {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   font-size: clamp(16px, 2.5vw, 18px);
   color: #64748b;
   margin: 0 auto 48px;
@@ -571,8 +602,9 @@
 
 .template-tag {
   color: #fff;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(14px, 2vw, 16px);
-  font-weight: 800;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -582,8 +614,9 @@
 }
 
 .template-tag span {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-medium);
   font-size: clamp(12px, 1.8vw, 14px);
-  font-weight: 500;
   opacity: 0.95;
 }
 
@@ -610,8 +643,9 @@ rect: none;
   border: none;
   border-radius: 10px;
   padding: 14px 28px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
   font-size: clamp(14px, 2vw, 16px);
-  font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -687,7 +721,8 @@ rect: none;
   top: clamp(24px, 5vw, 56px);
   right: 50%;
   color: #fff;
-  font-weight: 800;
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(20px, 3.5vw, 32px);
   line-height: 1.25;
   z-index: 3;
@@ -704,7 +739,8 @@ rect: none;
   border: none;
   border-radius: 10px;
   padding: clamp(12px, 2vw, 16px) clamp(24px, 4vw, 32px);
-  font-weight: 700;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
   font-size: clamp(14px, 2vw, 16px);
   z-index: 3;
   cursor: pointer;
@@ -776,14 +812,17 @@ rect: none;
 }
 
 .nl-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(22px, 3.5vw, 36px);
-  font-weight: 800;
   color: #0f172a;
   margin: 0 0 16px;
   line-height: 1.2;
 }
 
 .nl-copy {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   color: #64748b;
   font-size: clamp(14px, 2vw, 16px);
   margin: 0 0 28px;
@@ -878,13 +917,15 @@ rect: none;
   padding: 8px 14px;
   background: var(--brand-blue);
   color: #ffffff;
-  font-weight: 700;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
   font-size: clamp(10px, 1.8vw, 12px);
 }
 
 .faq-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(28px, 5vw, 40px);
-  font-weight: 800;
   color: #0f172a;
   margin: 10px 0 0;
 }
@@ -933,7 +974,8 @@ rect: none;
 
 .q-text {
   flex: 1;
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
   color: #0f172a;
 }
 
@@ -948,6 +990,8 @@ rect: none;
 
 .faq-answer {
   padding: 0 clamp(14px, 2vw, 18px) clamp(12px, 2vw, 16px) clamp(14px, 2vw, 18px);
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   color: #475569;
   line-height: 1.6;
   font-size: clamp(14px, 2vw, 16px);

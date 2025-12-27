@@ -4686,7 +4686,7 @@ export default function Builder() {
     }
   };
 
-  // ---------- styles (unchanged) ----------
+  // ---------- styles (updated with typography system) ----------
   const S = {
     page: {
       display: "grid",
@@ -4724,18 +4724,23 @@ export default function Builder() {
       boxSizing: "border-box",
     },
     headerTitle: {
-      fontSize: 20,
-      fontWeight: 700,
+      fontSize: "var(--font-size-2xl)",
+      fontWeight: "var(--font-weight-bold)",
       margin: 0,
       color: THEME.text,
     },
-    headerSub: { marginTop: 6, color: THEME.sub, fontSize: 14 },
+    headerSub: { 
+      marginTop: 6, 
+      color: THEME.sub, 
+      fontSize: "var(--font-size-base)",
+    },
     grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
     label: {
-      fontSize: 12,
+      fontSize: "var(--font-size-sm)",
       color: THEME.sub,
       marginBottom: 6,
       display: "block",
+      fontWeight: "var(--font-weight-medium)",
     },
     input: {
       width: "100%",
@@ -4744,7 +4749,7 @@ export default function Builder() {
       border: `1px solid ${THEME.border}`,
       background: THEME.inputBg,
       outline: "none",
-      fontSize: 14,
+      fontSize: "var(--font-size-base)",
       color: THEME.text,
     },
     dateInput: {
@@ -4754,8 +4759,8 @@ export default function Builder() {
       border: "2px solid #3b82f6",
       background: THEME.inputBg,
       outline: "none",
-      fontSize: 14,
-      fontFamily: "inherit",
+      fontSize: "var(--font-size-base)",
+      fontFamily: "var(--font-body)",
       cursor: "pointer",
       transition: "all 0.2s",
       color: THEME.text,
@@ -4770,8 +4775,12 @@ export default function Builder() {
       background: THEME.inputBg,
       color: THEME.text,
       whiteSpace: "pre-wrap",
+      fontSize: "var(--font-size-base)",
     },
-    small: { fontSize: 12, color: THEME.muted },
+    small: { 
+      fontSize: "var(--font-size-sm)", 
+      color: THEME.muted 
+    },
     btnRow: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" },
     btnSolid: {
       background: "#2563eb",
@@ -4779,8 +4788,8 @@ export default function Builder() {
     border: "none",
     borderRadius: "12px",
     padding: "12px 20px",
-      fontWeight: 600,
-    fontSize: "14px",
+      fontWeight: "var(--font-weight-semibold)",
+    fontSize: "var(--font-size-base)",
       cursor: "pointer",
     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
     transition: "all 0.2s ease-in-out",
@@ -4791,7 +4800,7 @@ export default function Builder() {
       border: "1px solid #93c5fd",
       borderRadius: 10,
       padding: "8px 12px",
-      fontWeight: 600,
+      fontWeight: "var(--font-weight-semibold)",
       cursor: "pointer",
     },
     stepperWrap: {
@@ -4807,7 +4816,7 @@ export default function Builder() {
       border: "2px solid #93c5fd",
       background: active ? "#2563eb" : done ? "#1d4ed8" : "#fff",
       color: active || done ? "#fff" : "#0f172a",
-      fontWeight: 800,
+      fontWeight: "var(--font-weight-bold)",
       display: "grid",
       placeItems: "center",
       boxShadow: active ? "0 0 0 4px rgba(37,99,235,0.15)" : "none",
@@ -4839,22 +4848,26 @@ export default function Builder() {
       border: "none",
       background: "white",
     },
-    hint: { color: "#64748b", fontSize: 12, marginLeft: 6 },
+    hint: { 
+      color: "#64748b", 
+      fontSize: "var(--font-size-sm)", 
+      marginLeft: 6 
+    },
     sectionTitle: {
       marginTop: 24,
-      fontWeight: 700,
-      fontSize: 16,
+      fontWeight: "var(--font-weight-bold)",
+      fontSize: "var(--font-size-lg)",
       color: "#0f172a",
     },
     chipRow: { display: "flex", gap: 8, flexWrap: "wrap" },
     chip: {
-      fontSize: 12,
+      fontSize: "var(--font-size-sm)",
       padding: "6px 10px",
       borderRadius: 999,
       background: "#eff6ff",
       border: "1px solid #bfdbfe",
       color: "#1d4ed8",
-      fontWeight: 600,
+      fontWeight: "var(--font-weight-semibold)",
       display: "inline-flex",
       alignItems: "center",
       gap: 6,
@@ -5943,7 +5956,11 @@ export default function Builder() {
         }
         
         const shouldUpgrade = await showConfirm(
-          `${errorMessage}\n\nUpgrade to Professional or Premium plan to download your resume in PDF, DOCX, or TXT format.\n\nYour progress will be saved. Would you like to upgrade now?`
+          `${errorMessage}
+
+Upgrade to Professional or Premium plan to download your resume in PDF, DOCX, or TXT format.
+
+Your progress will be saved. Would you like to upgrade now?`
         );
         if (shouldUpgrade) {
           // Store resume ID in localStorage for post-upgrade redirect
@@ -8717,19 +8734,19 @@ function CompletionModal({
 
   const S = {
     sectionTitle: {
-      fontSize: 17,
-      fontWeight: 600,
+      fontSize: "var(--font-size-lg)",
+      fontWeight: "var(--font-weight-semibold)",
       margin: "0 0 14px 0",
       color: THEME.text,
       borderBottom: `2px solid ${THEME.border}`,
       paddingBottom: 8,
     },
     label: {
-      fontSize: 12,
+      fontSize: "var(--font-size-sm)",
       color: THEME.sub,
       marginBottom: 5,
       display: "block",
-      fontWeight: 500,
+      fontWeight: "var(--font-weight-medium)",
       textTransform: "uppercase",
       letterSpacing: "0.5px",
     },
@@ -8745,8 +8762,8 @@ function CompletionModal({
       border: "none",
       borderRadius: "10px",
       padding: "10px 16px",
-      fontWeight: 600,
-      fontSize: "13px",
+      fontWeight: "var(--font-weight-semibold)",
+      fontSize: "var(--font-size-sm)",
       cursor: "pointer",
       boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       transition: "all 0.2s ease",
@@ -8757,13 +8774,13 @@ function CompletionModal({
       border: "1px solid #93c5fd",
       borderRadius: "10px",
       padding: "10px 16px",
-      fontSize: "13px",
-      fontWeight: 500,
+      fontSize: "var(--font-size-sm)",
+      fontWeight: "var(--font-weight-medium)",
       cursor: "pointer",
       transition: "all 0.2s ease",
     },
     small: {
-      fontSize: 12,
+      fontSize: "var(--font-size-sm)",
       color: THEME.muted,
       margin: "2px 0",
     },
@@ -8778,8 +8795,8 @@ function CompletionModal({
       color: "#4f46e5",
       padding: "6px 12px",
       borderRadius: "20px",
-      fontSize: 12,
-      fontWeight: 500,
+      fontSize: "var(--font-size-sm)",
+      fontWeight: "var(--font-weight-medium)",
     },
   };
 
@@ -8818,13 +8835,12 @@ function CompletionModal({
       background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
       flexShrink: 0,
     },
-    title: { fontSize: "22px", fontWeight: "700", color: "#0f172a", margin: 0 },
-    subtitle: { fontSize: "13px", color: "#64748b", margin: "4px 0 0" },
+    title: { fontSize: "var(--font-size-xl)", fontWeight: "var(--font-weight-bold)", color: "#0f172a", margin: 0 },
+    subtitle: { fontSize: "var(--font-size-sm)", color: "#64748b", margin: "4px 0 0" },
     closeBtn: {
       background: "none",
       border: "none",
-      fontSize: "28px",
-      color: "#64748b",
+      fontSize: "var(--font-size-2xl)", color: "#64748b",
       cursor: "pointer",
       padding: "6px",
       borderRadius: "8px",
@@ -8920,7 +8936,7 @@ function CompletionModal({
                 <p style={S.small}>
                     {formatDate(exp.startDate)} – {exp.current ? "Present" : formatDate(exp.endDate)}
                   </p>
-                  <ul style={{ margin: "8px 0 0 20px", fontSize: 13, lineHeight: "1.5" }}>
+                  <ul style={{ margin: "8px 0 0 20px", fontSize: "var(--font-size-sm)", lineHeight: "1.5" }}>
                     {exp.bullets.map((bullet, i) => (
                       <li key={i}>{bullet}</li>
                   ))}
@@ -8939,7 +8955,7 @@ function CompletionModal({
                     {edu.location ? ` • ${edu.location}` : ""}
                   </p>
                   {edu.details.length > 0 && (
-                    <ul style={{ margin: "8px 0 0 20px", fontSize: 13 }}>
+                    <ul style={{ margin: "8px 0 0 20px", fontSize: "var(--font-size-sm)" }}>
                       {edu.details.map((d, i) => <li key={i}>{d}</li>)}
                 </ul>
                   )}
@@ -9017,7 +9033,7 @@ function CompletionModal({
                     alignItems: "center",
                     justifyContent: "center",
                     color: "#94a3b8",
-                    fontSize: 15,
+                    fontSize: "var(--font-size-base)",
                   }}
                 >
                   Loading preview...

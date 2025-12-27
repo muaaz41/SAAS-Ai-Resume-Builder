@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
+import "./css/typography.css";
+import Typography from "./components/Typography.jsx";
 import SignIn from "./components/SignIn.jsx";
 import SignUp from "./components/SignUp.jsx";
 import Landing from "./components/Landing.jsx";
@@ -14,6 +16,7 @@ import Dashboard from "./components/Dashboard.jsx";
 import ATSChecker from "./components/ATSChecker.jsx";
 import Pricing from "./components/Pricing.jsx";
 import ResumeStartFlow from "./components/ResumeStartFlow.jsx";
+import TypographyDemo from "./components/TypographyDemo.jsx";
 
 function App() {
   return (
@@ -45,6 +48,7 @@ function App() {
       <Route path="/auth/linkedin/callback" element={<LinkedInCallback />} />
       <Route path="/ats-checker" element={<ATSChecker />} />
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/typography-demo" element={<TypographyDemo />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

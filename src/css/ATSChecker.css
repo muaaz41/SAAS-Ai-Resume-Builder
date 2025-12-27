@@ -14,8 +14,9 @@
 
 .job-description-label {
   display: block;
-  font-size: 16px;
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
   color: #374151;
   margin-bottom: 8px;
 }
@@ -25,7 +26,8 @@
   padding: 12px 16px;
   border: 2px solid #e5e7eb;
   border-radius: 8px;
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   resize: vertical;
   min-height: 100px;
@@ -55,8 +57,9 @@
   color: #374151;
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-xs);
   border: 1px solid #d1d5db;
 }
 
@@ -66,8 +69,9 @@
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
 }
 
 /* Missing Keywords */
@@ -81,7 +85,9 @@
 
 .missing-keywords strong {
   color: #dc2626;
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
 }
 
 /* Suggestion Priority */
@@ -124,8 +130,9 @@
 }
 
 .ats-hero-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(32px, 5vw, 48px);
-  font-weight: 800;
   color: #0f172a;
   line-height: 1.2;
   margin: 0 0 20px;
@@ -133,6 +140,8 @@
 }
 
 .ats-hero-subtitle {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   font-size: clamp(16px, 2.5vw, 18px);
   color: #64748b;
   line-height: 1.6;
@@ -155,8 +164,9 @@
   border-radius: 10px;
   height: 52px;
   padding: 0 28px;
-  font-weight: 700;
-  font-size: 16px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -178,8 +188,9 @@
   border-radius: 10px;
   height: 52px;
   padding: 0 28px;
-  font-weight: 600;
-  font-size: 16px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -273,16 +284,18 @@
 }
 
 .stat-number {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(24px, 3.5vw, 32px);
-  font-weight: 800;
   color: #007bff;
   margin-top: 6px;
 }
 
 .stat-label {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
   font-size: clamp(12px, 2vw, 14px);
   color: #64748b;
-  font-weight: 600;
   text-transform: none;
 }
 
@@ -299,15 +312,17 @@
 }
 
 .section-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-medium);
   font-size: clamp(18px, 3vw, 22px);
   color: #64748b;
   margin: 0 0 8px;
-  font-weight: 500;
 }
 
 .section-subtitle {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(32px, 5vw, 42px);
-  font-weight: 800;
   color: #0f172a;
   margin: 0 0 60px;
 }
@@ -341,13 +356,16 @@
 }
 
 .file-upload-area h4 {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-semibold);
   font-size: clamp(20px, 3vw, 24px);
-  font-weight: 700;
   color: #0f172a;
   margin: 0 0 12px;
 }
 
 .file-upload-area p {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
   font-size: clamp(14px, 2vw, 16px);
   color: #64748b;
   margin: 0 0 24px;
@@ -359,8 +377,9 @@
   border: none;
   border-radius: 10px;
   padding: 12px 24px;
-  font-weight: 600;
-  font-size: 16px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -386,19 +405,23 @@
 }
 
 .file-name {
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
   color: #0f172a;
   margin-bottom: 4px;
 }
 
 .file-size {
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
+  font-size: var(--font-size-sm);
   color: #64748b;
 }
 
 .analyzing {
   color: #007bff;
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
   animation: pulse 1.5s infinite;
 }
 
@@ -417,7 +440,9 @@
 }
 
 .upload-note p {
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
+  font-size: var(--font-size-sm);
   color: #64748b;
   margin: 0;
 }
@@ -428,8 +453,9 @@
   border: none;
   border-radius: 10px;
   padding: 16px 32px;
-  font-weight: 700;
-  font-size: 16px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
   cursor: pointer;
   transition: all 0.3s ease;
   min-width: 180px;
@@ -470,8 +496,9 @@
 }
 
 .score-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-semibold);
   font-size: 24px;
-  font-weight: 700;
   color: #0f172a;
   margin: 0 0 30px;
 }
@@ -495,15 +522,17 @@
 }
 
 .score-number {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
   font-size: 32px;
-  font-weight: 800;
   color: #007bff;
 }
 
 .overall-score {
-  font-size: 16px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-base);
   color: #64748b;
-  font-weight: 500;
 }
 
 .score-right {
@@ -535,8 +564,9 @@
 }
 
 .breakdown-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-semibold);
   font-size: 18px;
-  font-weight: 600;
   color: #0f172a;
 }
 
@@ -554,7 +584,9 @@
 }
 
 .breakdown-description {
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
+  font-size: var(--font-size-sm);
   color: #64748b;
   line-height: 1.5;
 }
@@ -571,8 +603,9 @@
 }
 
 .suggestions-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-semibold);
   font-size: clamp(28px, 4vw, 32px);
-  font-weight: 700;
   color: #0f172a;
   text-align: center;
   margin: 0 0 40px;
@@ -599,8 +632,9 @@
 }
 
 .suggestion-category {
-  font-size: 16px;
-  font-weight: 700;
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
   color: #007bff;
 }
 
@@ -610,8 +644,9 @@
   border: none;
   border-radius: 6px;
   padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -622,7 +657,9 @@
 }
 
 .suggestion-text {
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
+  font-size: var(--font-size-sm);
   color: #64748b;
   line-height: 1.5;
 }

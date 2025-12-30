@@ -4457,6 +4457,11 @@ export default function Builder() {
   const saveInFlightRef = useRef(false);
   const saveRetryTimerRef = useRef(null);
 
+  const isTrialUser =
+  user &&
+  user.subscriptionStatus === "trialing" &&
+  (!user.plan || user.plan === "free");
+
   const hasPaidPlan =
     user &&
     (user.subscriptionStatus === "active" ||
@@ -4659,7 +4664,9 @@ export default function Builder() {
 
   const templateDisplayName = formatTemplateName(resolvedTemplate);
   const hasTemplateSelected = Boolean(resolvedTemplate?.slug);
-  const isPremiumTemplate = resolvedTemplate?.category === "premium";
+  const isPremiumTemplate = resolvedTemplate?.category === "premium" || resolvedTemplate?.category === "industry";
+  // Trial users can edit and preview premium templates, but cannot download them
+  const canDownload = !isPremiumTemplate || (hasPaidPlan && !isTrialUser);
 
   // Helpers to keep experience rich text + bullets in sync
   const bulletsToHtml = (bullets = []) => {
@@ -5123,9 +5130,12 @@ export default function Builder() {
           // For fresh sessions, just prepare the template chooser and skip auto-select
           if (startFresh) {
             if (!templateChoice && items.length > 0) {
-              const defaultTpl = hasPaidPlan
-                ? items[0]
-                : items.find((t) => t.category === "free") || items[0];
+              // Allow trial users to select premium templates from ResumeStartFlow
+              // Use template from navigation state if available, otherwise default to first template
+              const slugFromNavigation = location.state?.templateSlug;
+              const defaultTpl = slugFromNavigation 
+                ? items.find((t) => t.slug === slugFromNavigation) || items[0]
+                : items[0];
               setTemplateChoice(defaultTpl.slug);
             }
             setIsInitializing(false);
@@ -5662,6 +5672,24 @@ export default function Builder() {
       }
       return;
     }
+
+    // 2. Trial user using a premium template → block download + show upgrade prompt
+  if (isTrialUser && isPremiumTemplate) {
+    const upgradeNow = await showConfirm(
+      "Premium templates are only available for download with a paid subscription.\n\n" +
+      "During your free trial you can edit and preview any template, but downloading requires upgrading.\n\n" +
+      "Would you like to upgrade now?"
+    );
+
+    if (upgradeNow) {
+      // Optional: save current resume ID for post-upgrade redirect
+      if (resumeId) {
+        localStorage.setItem("postUpgradeResumeId", resumeId);
+      }
+      navigate("/pricing");
+    }
+    return; // Stop export
+  }
     
     if (!resumeId) {
       showAlert("Please save your resume first", "warning");
@@ -6510,18 +6538,16 @@ Your progress will be saved. Would you like to upgrade now?`
               {templates.map((t) => {
                 const isPaid =
                   t.category === "premium" || t.category === "industry";
-                const locked = isPaid && !hasPaidPlan;
+                // Don't lock templates - allow trial users to select them
+                // They can edit and preview, but download will be restricted
                 return (
                   <option
                     key={t.slug}
-                    value={t.slug}
-                    disabled={locked}
-                    style={locked ? { color: "#9ca3af" } : undefined}>
+                    value={t.slug}>
                     {t.name || formatTemplateName(t)}
                     {t.category === "premium" || t.category === "industry"
                       ? " (Premium)"
                       : ""}
-                    {locked ? " – upgrade required" : ""}
                   </option>
                 );
               })}
@@ -6544,12 +6570,8 @@ Your progress will be saved. Would you like to upgrade now?`
                   if (!slug) return;
                   const tpl =
                     templates.find((t) => t.slug === slug) || templates[0];
-                  const isPaid =
-                    tpl.category === "premium" || tpl.category === "industry";
-                  if (isPaid && !hasPaidPlan) {
-                    navigate("/pricing");
-                    return;
-                  }
+                  // Allow trial users to select premium templates for editing
+                  // Download restrictions are enforced at download time
                   setSelectedTemplate(tpl);
                   setResume((prev) => ({
                     ...prev,
@@ -6643,18 +6665,8 @@ Your progress will be saved. Would you like to upgrade now?`
               const newTemplate = templates.find((t) => t.slug === newSlug);
               if (!newTemplate) return;
               
-              // Check if premium template and user doesn't have access
-              const isPremium = newTemplate.category === "premium" || newTemplate.category === "industry";
-              if (isPremium && !hasPaidPlan) {
-                showToast("Subscribe to access this premium template", {
-                  type: "warning",
-                  duration: 4000,
-                });
-                // Reset dropdown to previous value
-                e.target.value = resume.templateSlug || "";
-                return;
-              }
-              
+              // Allow trial users to select premium templates
+              // Download restrictions are enforced when attempting to download
               setIsTemplateLoading(true);
               setSelectedTemplate(newTemplate);
               setResume((r) => ({
@@ -6677,18 +6689,18 @@ Your progress will be saved. Would you like to upgrade now?`
             </option>
             {templates.map((template) => {
               const isPremium = template.category === "premium" || template.category === "industry";
-              const isLocked = isPremium && !hasPaidPlan;
+              // Allow trial users to select premium templates
+              // Download restrictions are enforced when attempting to download
               const templateName = formatTemplateName(template);
               
               return (
                 <option
                   key={template.slug}
                   value={template.slug}
-                  disabled={isLocked}
                   style={{
-                    color: isLocked ? "#94a3b8" : THEME.text,
+                    color: THEME.text,
                   }}>
-                  {templateName} {isPremium ? "(Premium)" : ""} {isLocked ? "🔒" : ""}
+                  {templateName} {isPremium ? "(Premium)" : ""}
                 </option>
               );
             })}
@@ -6705,20 +6717,6 @@ Your progress will be saved. Would you like to upgrade now?`
               }}>
               <span>⚠️</span>
               Please select a template to start building your resume
-            </div>
-          )}
-          {isPremiumTemplate && !hasPaidPlan && (
-            <div
-              style={{
-                fontSize: "12px",
-                color: "#7c3aed",
-                marginTop: "4px",
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-              }}>
-              <LockKey size={14} color="#94a3b8" weight="bold" />
-              Subscribe to access this premium template
             </div>
           )}
         </div>
@@ -8208,10 +8206,8 @@ Your progress will be saved. Would you like to upgrade now?`
             <button
               data-variant="ghost"
               onClick={() => {
-                if (!hasPaidPlan) {
-                  navigate("/pricing");
-                  return;
-                }
+                // Allow all users to preview, even trial users with premium templates
+                // Download restrictions are enforced in the modal
                 handleCompletion();
               }}
               disabled={!resumeId}
@@ -8240,8 +8236,8 @@ Your progress will be saved. Would you like to upgrade now?`
                 </>
               ) : (
                 <>
-                  <Lock size={14} strokeWidth={2.5} />
-                  <span style={{ color: "#4b5563" }}>Upgrade to Download</span>
+                  <Eye size={14} strokeWidth={2.5} />
+                  <span style={{ color: "#4b5563" }}>Preview</span>
                 </>
               )}
             </button>
@@ -8341,6 +8337,7 @@ Your progress will be saved. Would you like to upgrade now?`
           onExport={handleExport}
           exporting={exporting}
           exportingFormat={exportingFormat}
+          navigate={navigate}
         />
       )}
     </div>
@@ -8374,6 +8371,7 @@ Your progress will be saved. Would you like to upgrade now?`
         previewHtml: finalPreviewHtml,
         template: selectedTemplate,
         resumeId,
+        canDownload,
       });
       setShowCompletionModal(true);
     } catch (error) {
@@ -8384,6 +8382,7 @@ Your progress will be saved. Would you like to upgrade now?`
         previewHtml: previewHtml || "",
         template: selectedTemplate,
         resumeId,
+        canDownload,
       });
       setShowCompletionModal(true);
     }
@@ -8712,8 +8711,9 @@ function CompletionModal({
   onExport,
   exporting,
   exportingFormat,
+  navigate,
 }) {
-  const { resume, previewHtml, template, resumeId } = data;
+  const { resume, previewHtml, template, resumeId, canDownload } = data;
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
@@ -8974,30 +8974,51 @@ function CompletionModal({
 
             {/* Buttons moved here, sticky at bottom of left panel */}
             <div style={modalStyles.footerButtons}>
+             {canDownload ? (
+              <> 
+                <button
+                  style={S.btnSolid}
+                  onClick={() => onExport("pdf")}
+                  disabled={exporting && exportingFormat === "pdf"}
+                >
+                  {exporting && exportingFormat === "pdf" ? "Exporting PDF..." : "Download PDF"}
+                </button>
+                <button
+                  style={S.btnSolid}
+                  onClick={() => onExport("doc")}
+                  disabled={exporting && exportingFormat === "doc"}
+                >
+                  {exporting && exportingFormat === "doc" ? "Exporting DOC..." : "Download Word"}
+                </button>
+                <button
+                  style={S.btnSolid}
+                  onClick={() => onExport("txt")}
+                  disabled={exporting && exportingFormat === "txt"}
+                >
+                  {exporting && exportingFormat === "txt" ? "Exporting TXT..." : "Download TXT"}
+                </button>
+                {/* <button style={S.btnGhost} onClick={onClose}>
+                  Close
+                </button> */}
+              </>
+             ) : (  
+              <div style={{ textAlign: "center", padding: "32px 20px" }}>
+              <Lock size={48} color="#dc2626" weight="bold" />
+              <p style={{ margin: "16px 0 8px", fontWeight: 600, fontSize: 16 }}>
+                Upgrade required to download
+              </p>
+              <p style={{ color: "#64748b", marginBottom: 20 }}>
+                Premium templates can be edited and previewed during your free trial,<br />
+                but downloading requires a paid plan.
+              </p>
               <button
                 style={S.btnSolid}
-                onClick={() => onExport("pdf")}
-                disabled={exporting && exportingFormat === "pdf"}
+                onClick={() => navigate("/pricing")}
               >
-                {exporting && exportingFormat === "pdf" ? "Exporting PDF..." : "Download PDF"}
+                View Pricing Plans
               </button>
-              <button
-                style={S.btnSolid}
-                onClick={() => onExport("doc")}
-                disabled={exporting && exportingFormat === "doc"}
-              >
-                {exporting && exportingFormat === "doc" ? "Exporting DOC..." : "Download Word"}
-              </button>
-              <button
-                style={S.btnSolid}
-                onClick={() => onExport("txt")}
-                disabled={exporting && exportingFormat === "txt"}
-              >
-                {exporting && exportingFormat === "txt" ? "Exporting TXT..." : "Download TXT"}
-              </button>
-              {/* <button style={S.btnGhost} onClick={onClose}>
-                Close
-              </button> */}
+             </div>
+               )}
             </div>
           </div>
 

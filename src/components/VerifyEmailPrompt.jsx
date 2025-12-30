@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { showToast } from "../lib/toast";
 import Navbar from "./Navbar";
@@ -7,6 +8,7 @@ import Footer from "./Footer";
 
 export default function VerifyEmailPrompt() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const sentRef = useRef(false); // Prevent duplicate sends
@@ -52,22 +54,41 @@ export default function VerifyEmailPrompt() {
             {user?.email ? `We sent a verification link to ${user.email}.` : "We sent you a verification link."} Please check your inbox and click the link to continue.
           </p>
           <p style={{ margin: "0 0 16px", color: "#475569" }}>
-            Didn’t get it? You can resend the email below.
+            Didn't get it? You can resend the email below.
           </p>
-          <button
-            onClick={handleSend}
-            disabled={sending}
-            style={{
-              background: "#2563eb",
-              color: "#fff",
-              border: "none",
-              padding: "10px 16px",
-              borderRadius: 8,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}>
-            {sending ? "Sending..." : sent ? "Resend email" : "Send verification email"}
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              onClick={handleSend}
+              disabled={sending}
+              style={{
+                background: "#2563eb",
+                color: "#fff",
+                border: "none",
+                padding: "10px 16px",
+                borderRadius: 8,
+                fontWeight: 600,
+                cursor: "pointer",
+                flex: 1,
+              }}>
+              {sending ? "Sending..." : sent ? "Resend email" : "Send verification email"}
+            </button>
+            <button
+              onClick={() => navigate("/dashboard")}
+              style={{
+                background: "#fff",
+                color: "#2563eb",
+                border: "1px solid #2563eb",
+                padding: "10px 16px",
+                borderRadius: 8,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}>
+              I'll verify later
+            </button>
+          </div>
+          <p style={{ margin: "16px 0 0", fontSize: "12px", color: "#94a3b8" }}>
+            Note: Some features require email verification to access.
+          </p>
         </div>
       </main>
       <Footer />

@@ -113,6 +113,20 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config || {};
 
+    // Handle 403 Forbidden - Email Verification Required
+    if (error.response?.status === 403) {
+      const message = error.response?.data?.message || "";
+      // Check if it's an email verification error
+      if (message.toLowerCase().includes("verify") && message.toLowerCase().includes("email")) {
+        // Redirect to email verification page
+        const currentPath = window.location.pathname;
+        if (!currentPath.includes("/verify-email") && !currentPath.includes("/auth/verify")) {
+          window.location.href = "/verify-email";
+        }
+      }
+      return Promise.reject(error);
+    }
+
     // Handle 401 Unauthorized
     if (error.response?.status === 401 && !original._retry) {
       // Don't redirect if we're already in a failed state - let user continue working

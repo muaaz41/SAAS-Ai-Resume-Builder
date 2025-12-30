@@ -26,13 +26,14 @@ function App() {
       <Route path="/signin" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
       <Route path="/auth/verify-email" element={<VerifyEmailPrompt />} />
+      <Route path="/verify-email" element={<VerifyEmailPrompt />} />
       <Route path="/auth/verify" element={<VerifyEmailResult />} />
       <Route path="/auth/forgot-password" element={<ForgotPassword />} />
       <Route path="/auth/reset-password" element={<ResetPassword />} />
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requireVerified={true}>
             <Dashboard />
           </ProtectedRoute>
         }
@@ -40,7 +41,7 @@ function App() {
       <Route
         path="/builder"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requireVerified={true}>
             <Builder />
           </ProtectedRoute>
         }

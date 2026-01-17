@@ -13,6 +13,7 @@ import ResetPassword from "./components/ResetPassword.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Builder from "./components/Builder.jsx";
 import Dashboard from "./components/Dashboard.jsx";
+import AdminPanel from "./components/AdminPanel2.jsx";
 import ATSChecker from "./components/ATSChecker.jsx";
 import Pricing from "./components/Pricing.jsx";
 import ResumeStartFlow from "./components/ResumeStartFlow.jsx";
@@ -36,6 +37,13 @@ function App() {
           <ProtectedRoute requireVerified={true}>
             <Dashboard />
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          
+            <AdminPanel />
         }
       />
       <Route

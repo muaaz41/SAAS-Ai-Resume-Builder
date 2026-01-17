@@ -15,6 +15,9 @@ const RichTextToolbar = ({ onFormat, onInsertBullet }) => {
     cursor: "pointer",
     fontSize: 14,
     transition: "all 0.2s",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   };
 
   const buttonHoverStyle = {
@@ -31,11 +34,13 @@ const RichTextToolbar = ({ onFormat, onInsertBullet }) => {
         borderRadius: "10px 10px 0 0",
         borderBottom: "1px solid #e5e7eb",
         flexWrap: "wrap",
+        alignItems: "center",
       }}>
-      {/* <button
+      {/* Text Formatting */}
+      <button
         type="button"
         onClick={() => onFormat("bold")}
-        style={{ ...buttonStyle, fontWeight: "bold" }}
+        style={{ ...buttonStyle, fontWeight: "bold", minWidth: "36px" }}
         onMouseEnter={(e) => (e.target.style.background = "#f1f5f9")}
         onMouseLeave={(e) => (e.target.style.background = "#fff")}
         title="Bold (Ctrl+B)">
@@ -45,7 +50,7 @@ const RichTextToolbar = ({ onFormat, onInsertBullet }) => {
       <button
         type="button"
         onClick={() => onFormat("italic")}
-        style={{ ...buttonStyle, fontStyle: "italic" }}
+        style={{ ...buttonStyle, fontStyle: "italic", minWidth: "36px" }}
         onMouseEnter={(e) => (e.target.style.background = "#f1f5f9")}
         onMouseLeave={(e) => (e.target.style.background = "#fff")}
         title="Italic (Ctrl+I)">
@@ -55,22 +60,73 @@ const RichTextToolbar = ({ onFormat, onInsertBullet }) => {
       <button
         type="button"
         onClick={() => onFormat("underline")}
-        style={{ ...buttonStyle, textDecoration: "underline" }}
+        style={{ ...buttonStyle, textDecoration: "underline", minWidth: "36px" }}
         onMouseEnter={(e) => (e.target.style.background = "#f1f5f9")}
         onMouseLeave={(e) => (e.target.style.background = "#fff")}
         title="Underline (Ctrl+U)">
-        U
+        <u>U</u>
       </button>
 
       <div
         style={{
           width: 1,
+          height: "24px",
           background: "#cbd5e1",
           margin: "0 4px",
-          alignSelf: "stretch",
-        }} */}
-      {/* /> */}
+        }}
+      />
 
+      {/* Text Alignment */}
+      <button
+        type="button"
+        onClick={() => onFormat("justifyLeft")}
+        style={{ ...buttonStyle, minWidth: "36px" }}
+        onMouseEnter={(e) => (e.target.style.background = "#f1f5f9")}
+        onMouseLeave={(e) => (e.target.style.background = "#fff")}
+        title="Align Left">
+        <span style={{ fontSize: "16px" }}>⬅</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onFormat("justifyCenter")}
+        style={{ ...buttonStyle, minWidth: "36px" }}
+        onMouseEnter={(e) => (e.target.style.background = "#f1f5f9")}
+        onMouseLeave={(e) => (e.target.style.background = "#fff")}
+        title="Align Center">
+        <span style={{ fontSize: "16px" }}>↔</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onFormat("justifyRight")}
+        style={{ ...buttonStyle, minWidth: "36px" }}
+        onMouseEnter={(e) => (e.target.style.background = "#f1f5f9")}
+        onMouseLeave={(e) => (e.target.style.background = "#fff")}
+        title="Align Right">
+        <span style={{ fontSize: "16px" }}>➡</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onFormat("justifyFull")}
+        style={{ ...buttonStyle, minWidth: "36px" }}
+        onMouseEnter={(e) => (e.target.style.background = "#f1f5f9")}
+        onMouseLeave={(e) => (e.target.style.background = "#fff")}
+        title="Justify">
+        <span style={{ fontSize: "14px", fontWeight: "bold" }}>⬌</span>
+      </button>
+
+      <div
+        style={{
+          width: 1,
+          height: "24px",
+          background: "#cbd5e1",
+          margin: "0 4px",
+        }}
+      />
+
+      {/* Bullet Insert */}
       <button
         type="button"
         onClick={onInsertBullet}

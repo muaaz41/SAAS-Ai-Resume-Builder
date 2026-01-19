@@ -632,7 +632,7 @@ export default function Builder() {
             localStorage.getItem("lastResumeId") ||
             null;
         const [tplRes, resumeRes] = await Promise.all([
-          api.get("/api/v1/templates"),
+          token ? api.get("/api/v1/templates") : api.get("/api/v1/templates/public"),
           wantedId
             ? api.get(`/api/v1/resumes/${wantedId}`)
             : Promise.resolve({ data: null }),
@@ -1399,12 +1399,13 @@ export default function Builder() {
       }
       
       const shouldSignup = await showConfirm(
-        "You need to sign up to download your resume.\n\nYour progress will be saved. Would you like to sign up now?"
+        "You need to sign up and subscribe to download your resume.\n\nYour progress will be saved. Would you like to sign up now?"
       );
       if (shouldSignup) {
+        sessionStorage.setItem("pendingFlow", "download");
         navigate("/signup", {
           state: {
-            redirectTo: "/builder",
+            redirectTo: "/pricing",
             templateSlug: resume.templateSlug || selectedTemplate?.slug,
           },
         });
@@ -1445,8 +1446,10 @@ export default function Builder() {
       try {
         // Fetch what the server currently has to confirm sections are present
         const srv = await api.get(`/api/v1/resumes/${resumeId}`);
-        const srvResume = srv?.data?.data?.resume || srv?.data?.data || {};
-        console.log("[Export] Server resume template:", srvResume.templateSlug);
+        const srvData = srv?.data?.data || {};
+        const srvResume = srvData.resume || srvData;
+        console.log("[Export] Server resume template:", srvData.templateSlug || srvResume.template?.slug || 'undefined');
+        console.log("[Export] Server resume data:", srvResume);
         console.log(
           "[Export] Server contact summary length:",
           (srvResume.contact?.summary || "").length
@@ -1495,7 +1498,7 @@ export default function Builder() {
         const urlToUse = isLocal ? directUrl : proxiedUrl;
         res = await api.get(urlToUse, {
           responseType: format === "txt" ? "text" : "blob",
-          timeout: 30000,
+          timeout: 60000,
           withCredentials: true,
         });
       } catch (firstErr) {
@@ -1506,7 +1509,7 @@ export default function Builder() {
         // Fallback to proxied path
         res = await api.get(proxiedUrl, {
           responseType: format === "txt" ? "text" : "blob",
-          timeout: 30000,
+          timeout: 60000,
           withCredentials: true,
         });
       }

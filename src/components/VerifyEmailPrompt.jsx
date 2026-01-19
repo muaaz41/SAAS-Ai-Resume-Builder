@@ -56,7 +56,7 @@ export default function VerifyEmailPrompt() {
           <p style={{ margin: "0 0 16px", color: "#475569" }}>
             Didn't get it? You can resend the email below.
           </p>
-          <div style={{ display: "flex", gap: "8px" }}>
+          {/* <div style={{ display: "flex", gap: "8px" }}>
             <button
               onClick={handleSend}
               disabled={sending}
@@ -85,7 +85,7 @@ export default function VerifyEmailPrompt() {
               }}>
               I'll verify later
             </button>
-          </div>
+          </div> */}
           <p style={{ margin: "16px 0 0", fontSize: "12px", color: "#94a3b8" }}>
             Note: Some features require email verification to access.
           </p>

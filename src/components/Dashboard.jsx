@@ -1437,9 +1437,7 @@
 //                       });
 //                     }
 //                   : handleSelectTemplate;
-//                 const handlePreview = locked
-//                   ? () => navigate("/pricing")
-//                   : handlePreviewTemplate;
+//                 const handlePreview = handlePreviewTemplate;
 
 //                 return (
 //                 <TemplateCard
@@ -3776,20 +3774,18 @@ export default function Dashboard() {
                       });
                     }
                   : handleSelectTemplate;
-                const handlePreview = locked
-                  ? () => navigate("/pricing")
-                  : handlePreviewTemplate;
+                const handlePreview = handlePreviewTemplate;
 
                 return (
-                <TemplateCard
-                  key={t.slug}
-                  template={t}
-                    isPremium={isPaid}
-                    locked={locked}
-                    onSelect={handleSelect}
-                    onPreview={handlePreview}
-                  />
-                );
+                  <TemplateCard
+                    key={t.slug}
+                    template={t}
+                      isPremium={isPaid}
+                      locked={locked}
+                      onSelect={handleSelect}
+                      onPreview={handlePreview}
+                    />
+                  );
               })}
             </div>
           )}

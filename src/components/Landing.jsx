@@ -90,7 +90,7 @@ const Landing = () => {
             <button
               className="btn-primary"
               onClick={() => navigate("/resume-start")}>
-              Get Started Free
+              Create My Resume
             </button>
             <div className="active-users">
               <img

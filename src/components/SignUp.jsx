@@ -58,8 +58,8 @@ const SignUp = () => {
       if (redirectTo && templateSlug) {
         sessionStorage.setItem("postVerificationRedirect", redirectTo);
         sessionStorage.setItem("postVerificationTemplateSlug", templateSlug);
-      } else if (pendingFlow === "builder" && pendingTemplateSlug) {
-        sessionStorage.setItem("postVerificationRedirect", "/builder");
+      } else if (pendingFlow === "download") {
+        sessionStorage.setItem("postVerificationRedirect", "/pricing");
         sessionStorage.setItem("postVerificationTemplateSlug", pendingTemplateSlug);
       } else if (pendingFlow === "upload") {
         sessionStorage.setItem("postVerificationRedirect", "/dashboard");

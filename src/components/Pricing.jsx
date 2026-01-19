@@ -101,12 +101,19 @@ const Pricing = () => {
               
               // Check if user was redirected from builder and restore their resume
               const postUpgradeResumeId = localStorage.getItem("postUpgradeResumeId");
+              const pendingResumeData = sessionStorage.getItem("pendingResumeData");
               if (postUpgradeResumeId) {
                 localStorage.removeItem("postUpgradeResumeId");
                 setTimeout(() => {
                   navigate("/builder", {
                     state: { resumeId: postUpgradeResumeId },
                   });
+                }, 1500);
+                return;
+              } else if (pendingResumeData) {
+                // User was building a resume before subscribing, redirect back to builder
+                setTimeout(() => {
+                  navigate("/builder");
                 }, 1500);
                 return;
               }

@@ -24,11 +24,15 @@ const Navbar = () => {
         {/* Desktop Navigation */}
         <nav className="nav-links">
           <Link to="/">Home</Link>
-          <Link to="/builder" state={{ startFresh: true }}>
-            Resume Builder
-          </Link>
+          {token && (
+            <Link to="/builder" state={{ startFresh: true }}>
+              Resume Builder
+            </Link>
+          )}
           <Link to="/ats-checker">ATS Checker</Link>
-          <Link to="/dashboard">User Dashboard</Link>
+          {token && (
+            <Link to="/dashboard">User Dashboard</Link>
+          )}
           <Link to="/pricing">Pricing Plan</Link>
         </nav>
 
@@ -79,18 +83,22 @@ const Navbar = () => {
           <Link to="/" onClick={toggleMobileMenu}>
             Home
           </Link>
-          <Link
-            to="/builder"
-            state={{ startFresh: true }}
-            onClick={toggleMobileMenu}>
-            Resume Builder
-          </Link>
+          {token && (
+            <Link
+              to="/builder"
+              state={{ startFresh: true }}
+              onClick={toggleMobileMenu}>
+              Resume Builder
+            </Link>
+          )}
           <Link to="/ats-checker" onClick={toggleMobileMenu}>
             ATS Checker
           </Link>
-          <Link to="/dashboard" onClick={toggleMobileMenu}>
-            User Dashboard
-          </Link>
+          {token && (
+            <Link to="/dashboard" onClick={toggleMobileMenu}>
+              User Dashboard
+            </Link>
+          )}
           <Link to="/pricing" onClick={toggleMobileMenu}>
             Pricing Plan
           </Link>

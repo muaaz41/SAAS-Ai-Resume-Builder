@@ -7,6 +7,13 @@ import { showToast } from "../lib/toast";
 import { ArrowLeft, Eye, Lock } from "lucide-react";
 import { CalendarDots,  LockKeyIcon,  Sparkle } from "@phosphor-icons/react";
 import { showAlert, showConfirm } from "../lib/alert.js";
+import ExportGateModal from "./ExportGateModal.jsx";
+import {
+  saveResumeToLocal,
+  getResumeFromLocal,
+  clearResumeLocal,
+  calculateResumeProgress,
+} from "../lib/localStorage.js";
 
 const HIDDEN_TEMPLATE_NAMES = new Set([
   // "Modern Flat",
@@ -148,7 +155,9 @@ export default function Builder() {
   // ---------- state ----------
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [showTemplateDialog, setShowTemplateDialog] = useState(startFresh);
+  // Don't show template dialog if template is already selected from navigation (for both logged-in and non-logged-in users)
+  const shouldShowTemplateDialog = startFresh && !navigationState.templateSlug;
+  const [showTemplateDialog, setShowTemplateDialog] = useState(shouldShowTemplateDialog);
   const [templateChoice, setTemplateChoice] = useState("");
 
   const resumeIdFromNav = navigationState.resumeId || null;
@@ -176,6 +185,8 @@ export default function Builder() {
   const [aiGeneratedText, setAiGeneratedText] = useState(""); // For AI-generated text preview
   const [showAiPreview, setShowAiPreview] = useState(false); // Show/hide AI preview
   const [isTemplateLoading, setIsTemplateLoading] = useState(false);
+  const [showExportGate, setShowExportGate] = useState(false);
+  const [pendingExportFormat, setPendingExportFormat] = useState(null);
 
   // Prevent outer page scroll while in builder; restore on unmount
   useEffect(() => {
@@ -195,6 +206,7 @@ export default function Builder() {
   const previewRetryTimerRef = useRef(null);
   const saveInFlightRef = useRef(false);
   const saveRetryTimerRef = useRef(null);
+  const prevTemplateSlugRef = useRef(null); // Track previous template to detect changes
 
   const isTrialUser =
   user &&
@@ -211,6 +223,8 @@ export default function Builder() {
   const getInitialResumeData = (seedId) => {
     if (startFresh && !seedId) {
       // Always start clean when launching builder fresh from navbar
+      // Use templateSlug from navigation state if available, otherwise default to "modern-slate"
+      const templateSlugFromNav = navigationState.templateSlug || "modern-slate";
       return {
         title: "My Resume",
         contact: {
@@ -252,7 +266,7 @@ export default function Builder() {
         projects: [],
         hobbies: [],
         awards: [],
-        templateSlug: "modern-slate",
+        templateSlug: templateSlugFromNav,
       };
     }
 
@@ -712,13 +726,21 @@ export default function Builder() {
             /* ignore bad local data */
           }
 
-          // Check for pending resume data from signup flow
+          // Check for pending resume data from signup flow OR localStorage
           let pendingResumeData = null;
           try {
             const pendingDataStr = sessionStorage.getItem("pendingResumeData");
             if (pendingDataStr) {
               pendingResumeData = JSON.parse(pendingDataStr);
               sessionStorage.removeItem("pendingResumeData");
+            } else if (!token && !initialResumeId && !startFresh) {
+              // If user is not authenticated and no resumeId, load from localStorage
+              // BUT skip localStorage if startFresh is true (user selected a template from dashboard)
+              const localData = getResumeFromLocal();
+              if (localData) {
+                pendingResumeData = localData;
+                console.log("📦 Loaded resume from localStorage (no account)");
+              }
             }
           } catch (e) {
             console.warn("Failed to parse pending resume data:", e);
@@ -734,14 +756,25 @@ export default function Builder() {
             sessionStorage.removeItem("pendingTemplateSlug");
           }
           const slugFromResume = merged.templateSlug || serverTemplateSlug;
-          const finalSlug =
-            slugFromResume || slugFromLocation || pendingTemplateSlug || sortedTemplates[0]?.slug || "modern-slate";
+          // For startFresh, prioritize templateSlug from navigation state over resume template and localStorage
+          // This ensures that when user selects a template from Dashboard, that template is used even if resume has different template
+          const finalSlug = startFresh && slugFromLocation
+            ? slugFromLocation
+            : slugFromResume || slugFromLocation || pendingTemplateSlug || sortedTemplates[0]?.slug || "modern-slate";
+          
+          // If startFresh and template from navigation differs from resume template, update resume template
+          if (startFresh && slugFromLocation && slugFromLocation !== slugFromResume) {
+            // Template from navigation state takes priority
+            console.log(`🔄 Template override: Using ${slugFromLocation} from navigation instead of ${slugFromResume} from resume`);
+          }
           
           // Merge pending resume data if available
+          // But don't merge templateSlug if startFresh is true (user selected a template from dashboard)
           if (pendingResumeData) {
+            const { templateSlug: _, ...pendingDataWithoutTemplate } = pendingResumeData;
             merged = {
               ...merged,
-              ...pendingResumeData,
+              ...pendingDataWithoutTemplate,
               contact: { ...merged.contact, ...pendingResumeData.contact },
               experience: pendingResumeData.experience || merged.experience,
               education: pendingResumeData.education || merged.education,
@@ -750,6 +783,11 @@ export default function Builder() {
               hobbies: pendingResumeData.hobbies || merged.hobbies,
               awards: pendingResumeData.awards || merged.awards,
             };
+            // Don't override templateSlug from localStorage if startFresh is true
+            // The finalSlug will be set correctly based on navigation state
+            if (!startFresh && pendingResumeData.templateSlug) {
+              merged.templateSlug = pendingResumeData.templateSlug;
+            }
           }
           const finalT =
             sortedTemplates.find((x) => x.slug === finalSlug) || null;
@@ -868,28 +906,168 @@ export default function Builder() {
           // No existing resume found
           // For fresh sessions, just prepare the template chooser and skip auto-select
           if (startFresh) {
-            if (!templateChoice && items.length > 0) {
+            if (items.length > 0) {
               // Allow trial users to select premium templates from ResumeStartFlow
               // Use template from navigation state if available, otherwise default to first template
               const slugFromNavigation = location.state?.templateSlug;
               const defaultTpl = slugFromNavigation 
                 ? items.find((t) => t.slug === slugFromNavigation) || items[0]
                 : items[0];
-              setTemplateChoice(defaultTpl.slug);
+              const finalSlug = defaultTpl.slug;
+              
+              // Set template choice for the dialog (only if dialog will be shown)
+              if (shouldShowTemplateDialog && !templateChoice) {
+                setTemplateChoice(finalSlug);
+              }
+              
+              // Also set the selected template and update resume templateSlug
+              // This ensures the template dropdown shows the correct value immediately
+              setSelectedTemplate(defaultTpl);
+              // Force update resume templateSlug to match navigation state template
+              // This ensures non-logged-in users get the correct template
+              setResume((prev) => {
+                // Only update if templateSlug is different to avoid unnecessary re-renders
+                if (prev.templateSlug !== finalSlug) {
+                  return { ...prev, templateSlug: finalSlug };
+                }
+                return prev;
+              });
+              
+              // If template is already selected from navigation, hide dialog and fetch preview
+              if (slugFromNavigation) {
+                setShowTemplateDialog(false);
+                // Fetch preview for non-logged-in users with their data (same rendering as logged-in users)
+                if (!token) {
+                  // Prepare resume data in the format expected by the render endpoint
+                  const resumeDataForRender = {
+                    contact: resume.contact || {},
+                    experience: resume.experience || [],
+                    education: resume.education || [],
+                    skills: resume.skills || [],
+                    projects: resume.projects || [],
+                    hobbies: resume.hobbies || [],
+                    awards: resume.awards || [],
+                  };
+                  fetchTemplatePreview(finalSlug, resumeDataForRender);
+                }
+              }
             }
+            // Set initializing to false immediately after templates are loaded and template is set
+            // This allows the UI to render immediately for non-logged-in users
             setIsInitializing(false);
             return;
           }
 
+          // Check for pending resume data from import/upload (for non-logged-in users)
+          let pendingResumeData = null;
+          try {
+            const pendingDataStr = sessionStorage.getItem("pendingResumeData");
+            if (pendingDataStr) {
+              pendingResumeData = JSON.parse(pendingDataStr);
+              sessionStorage.removeItem("pendingResumeData");
+            }
+          } catch (e) {
+            console.warn("Failed to parse pending resume data:", e);
+          }
+
+          // Use template from navigation state, pendingResumeData, or default
+          const pendingTemplateSlug = sessionStorage.getItem("pendingTemplateSlug");
+          if (pendingTemplateSlug) {
+            sessionStorage.removeItem("pendingTemplateSlug");
+          }
           const initialSlug =
             location.state?.templateSlug ||
+            pendingResumeData?.templateSlug ||
+            pendingTemplateSlug ||
             sortedTemplates[0]?.slug ||
             "modern-slate";
           const t = sortedTemplates.find((x) => x.slug === initialSlug) || null;
           setSelectedTemplate(t || null);
 
           const finalTemplateSlug = t?.slug || "modern-slate";
-          setResume((prev) => ({ ...prev, templateSlug: finalTemplateSlug }));
+          
+          // Merge pending resume data if available (for non-logged-in users importing resumes)
+          let mergedResumeData = null;
+          if (pendingResumeData) {
+            const normalizeDate = (val) => {
+              if (!val) return "";
+              if (typeof val === "string") {
+                if (val.includes("T")) return val.split("T")[0];
+                if (val.length >= 10) return val.slice(0, 10);
+                return val;
+              }
+              try {
+                const d = new Date(val);
+                if (!isNaN(d)) return d.toISOString().split("T")[0];
+              } catch {}
+              return "";
+            };
+
+            const safeExperience =
+              pendingResumeData.experience?.length > 0
+                ? pendingResumeData.experience.map((e) => ({
+                    ...e,
+                    startDate: normalizeDate(e.startDate),
+                    endDate: e.current ? "" : normalizeDate(e.endDate),
+                    bullets: e.bullets || [],
+                  }))
+                : [];
+
+            const safeEducation =
+              pendingResumeData.education?.length > 0
+                ? pendingResumeData.education.map((e) => ({
+                    ...e,
+                    startDate: normalizeDate(e.startDate),
+                    endDate: normalizeDate(e.endDate),
+                    details: e.details || [],
+                  }))
+                : [];
+
+            // Build merged data for both state update and preview
+            mergedResumeData = {
+              title: pendingResumeData.title || resume.title,
+              contact: {
+                ...resume.contact,
+                ...(pendingResumeData.contact || {}),
+              },
+              experience: safeExperience.length > 0 ? safeExperience : resume.experience,
+              education: safeEducation.length > 0 ? safeEducation : resume.education,
+              skills: Array.isArray(pendingResumeData.skills) && pendingResumeData.skills.length > 0
+                ? pendingResumeData.skills
+                : resume.skills,
+              projects: Array.isArray(pendingResumeData.projects) && pendingResumeData.projects.length > 0
+                ? pendingResumeData.projects
+                : resume.projects,
+              hobbies: Array.isArray(pendingResumeData.hobbies) && pendingResumeData.hobbies.length > 0
+                ? pendingResumeData.hobbies
+                : resume.hobbies,
+              awards: Array.isArray(pendingResumeData.awards) && pendingResumeData.awards.length > 0
+                ? pendingResumeData.awards
+                : resume.awards,
+              templateSlug: finalTemplateSlug,
+            };
+
+            setResume(mergedResumeData);
+          } else {
+            setResume((prev) => ({ ...prev, templateSlug: finalTemplateSlug }));
+          }
+          
+          // Fetch preview for non-logged-in users when template is set (with their data)
+          if (!token && !resumeId && finalTemplateSlug) {
+            // Use merged data if available, otherwise use current resume state
+            const dataToUse = mergedResumeData || resume;
+            // Prepare resume data in the format expected by the render endpoint
+            const resumeDataForRender = {
+              contact: dataToUse.contact || {},
+              experience: dataToUse.experience || [],
+              education: dataToUse.education || [],
+              skills: dataToUse.skills || [],
+              projects: dataToUse.projects || [],
+              hobbies: dataToUse.hobbies || [],
+              awards: dataToUse.awards || [],
+            };
+            fetchTemplatePreview(finalTemplateSlug, resumeDataForRender);
+          }
 
           setIsInitializing(false);
 
@@ -952,6 +1130,15 @@ export default function Builder() {
       const defaultTemplate =
         selectedTemplate?.slug || templates[0]?.slug || "modern-slate";
       setResume((prev) => ({ ...prev, templateSlug: defaultTemplate }));
+      return;
+    }
+
+    // If user is not authenticated, just save to localStorage (no backend save)
+    if (!token) {
+      saveResumeToLocal({
+        ...resume,
+        templateSlug: resume.templateSlug || selectedTemplate?.slug,
+      });
       return;
     }
 
@@ -1096,16 +1283,32 @@ export default function Builder() {
     }
   };
 
-  // one clean autosave: 1 second after last change to avoid rate limiting
+  // Auto-save: Backend save (if authenticated) + localStorage (always)
   useEffect(() => {
     if (templates.length === 0 || !resume.templateSlug || isInitializing)
       return;
-    const t = setTimeout(() => {
-      upsertResume();
-    }, 1000); // Increased to 1 second to avoid rate limiting
-    return () => clearTimeout(t);
+
+    // Backend save: 1 second after last change (if authenticated)
+    let backendSaveTimer;
+    if (token) {
+      backendSaveTimer = setTimeout(() => {
+        upsertResume();
+      }, 1000);
+    }
+
+    // Always save to localStorage for non-authenticated users
+    if (!token) {
+      saveResumeToLocal({
+        ...resume,
+        templateSlug: resume.templateSlug || selectedTemplate?.slug,
+      });
+    }
+
+    return () => {
+      if (backendSaveTimer) clearTimeout(backendSaveTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resume, templates.length, isInitializing]);
+  }, [resume, templates.length, isInitializing, token, selectedTemplate]);
 
   // ---------- AI helpers ----------
   const generateSummary = async () => {
@@ -1376,40 +1579,13 @@ export default function Builder() {
   const handleExport = async (format) => {
     // Check if user is logged in
     if (!token || !user) {
-      // Save current resume data to sessionStorage before redirecting
-      try {
-        const resumeDataToSave = {
-          title: resume.title,
-          templateSlug: resume.templateSlug || selectedTemplate?.slug,
-          contact: resume.contact,
-          experience: resume.experience,
-          education: resume.education,
-          skills: resume.skills,
-          projects: resume.projects,
-          hobbies: resume.hobbies,
-          awards: resume.awards,
-        };
-        sessionStorage.setItem("pendingResumeData", JSON.stringify(resumeDataToSave));
-        sessionStorage.setItem("pendingFlow", "builder");
-        if (resume.templateSlug || selectedTemplate?.slug) {
-          sessionStorage.setItem("pendingTemplateSlug", resume.templateSlug || selectedTemplate?.slug);
-        }
-      } catch (e) {
-        console.warn("Failed to save resume data:", e);
-      }
-      
-      const shouldSignup = await showConfirm(
-        "You need to sign up and subscribe to download your resume.\n\nYour progress will be saved. Would you like to sign up now?"
-      );
-      if (shouldSignup) {
-        sessionStorage.setItem("pendingFlow", "download");
-        navigate("/signup", {
-          state: {
-            redirectTo: "/pricing",
-            templateSlug: resume.templateSlug || selectedTemplate?.slug,
-          },
-        });
-      }
+      // Save to localStorage and show Export Gate Modal
+      saveResumeToLocal({
+        ...resume,
+        templateSlug: resume.templateSlug || selectedTemplate?.slug,
+      });
+      setPendingExportFormat(format);
+      setShowExportGate(true);
       return;
     }
 
@@ -1775,15 +1951,80 @@ Your progress will be saved. Would you like to upgrade now?`
     typingRef.current = Date.now();
   };
 
-  // ---------- Server preview with rate limiting ----------
-  const fetchServerPreview = async () => {
-    if (!resumeId || !resume.templateSlug) return;
+  // ---------- Fetch template preview for non-logged-in users ----------
+  const fetchTemplatePreview = async (templateSlug, resumeData = null) => {
+    if (!templateSlug) return;
+    
+    try {
+      let response;
+      
+      // If resume data is provided, render template with user's data (same as logged-in users)
+      // Otherwise, just fetch the default template preview
+      if (resumeData) {
+        // Use the new render endpoint that accepts custom data
+        response = await fetch(`/api/v1/templates/${templateSlug}/render`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(resumeData),
+        });
+      } else {
+        // Use public template preview endpoint for initial load
+        response = await fetch(`/api/v1/templates/${templateSlug}/preview`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "text/html",
+          },
+          credentials: "include",
+        });
+      }
 
-    // Rate limiting: don't fetch preview more than once every 3 seconds
-    const sinceLastPreview = Date.now() - lastPreviewAtRef.current;
-    if (sinceLastPreview < 3000) {
-      console.log("⏳ Rate limiting: skipping preview fetch (too soon)");
+      if (!response.ok) {
+        throw new Error(`Preview failed: ${response.status} ${response.statusText}`);
+      }
+
+      const htmlContent = await response.text();
+      setServerPreview(htmlContent);
+      setServerPreviewUrl(""); // Clear URL if using HTML directly
+    } catch (error) {
+      console.error("Failed to fetch template preview:", error);
+      // Fall back to local preview
+      setServerPreview("");
+    } finally {
+      setIsTemplateLoading(false);
+    }
+  };
+
+  // ---------- Server preview with rate limiting ----------
+  const fetchServerPreview = async (skipRateLimit = false) => {
+    if (!resumeId || !resume.templateSlug) {
+      // For non-logged-in users, fetch template preview with their resume data
+      if (!token && resume.templateSlug) {
+        // Prepare resume data in the format expected by the render endpoint
+        const resumeDataForRender = {
+          contact: resume.contact || {},
+          experience: resume.experience || [],
+          education: resume.education || [],
+          skills: resume.skills || [],
+          projects: resume.projects || [],
+          hobbies: resume.hobbies || [],
+          awards: resume.awards || [],
+        };
+        await fetchTemplatePreview(resume.templateSlug, resumeDataForRender);
+      }
       return;
+    }
+
+    // Rate limiting: don't fetch preview more than once every 800ms
+    // Skip rate limiting for template changes (skipRateLimit = true)
+    if (!skipRateLimit) {
+      const sinceLastPreview = Date.now() - lastPreviewAtRef.current;
+      if (sinceLastPreview < 800) {
+        console.log("⏳ Rate limiting: skipping preview fetch (too soon)");
+        return;
+      }
     }
 
     // Don't fetch if already fetching
@@ -1868,16 +2109,62 @@ Your progress will be saved. Would you like to upgrade now?`
     });
   };
 
-  // Fetch server preview with longer debounce to avoid rate limiting
+  // Initialize prevTemplateSlugRef if not already set
+  if (prevTemplateSlugRef.current === null) {
+    prevTemplateSlugRef.current = resume.templateSlug;
+  }
+
+  // Fetch server preview with debounce to avoid rate limiting
   useEffect(() => {
-    if (!resumeId || !resume.templateSlug) return;
+    if (!resume.templateSlug) return;
 
-    // Longer debounce to avoid rate limiting
-    const timeoutId = setTimeout(() => {
-      fetchServerPreview();
-    }, 2000); // Increased to 2 seconds to avoid rate limiting
+    // For non-logged-in users, render template with their data (same as logged-in users)
+    if (!token && !resumeId) {
+      // Check if template changed (immediate fetch) vs other data changes (debounced)
+      const isTemplateChange = prevTemplateSlugRef.current !== resume.templateSlug;
+      prevTemplateSlugRef.current = resume.templateSlug;
 
-    return () => clearTimeout(timeoutId);
+      // For template changes, fetch immediately (user expects quick feedback)
+      // For other changes, use debounce to avoid rate limiting
+      const delay = isTemplateChange ? 50 : 1500; // 50ms for template change, 1.5s for other changes
+
+      const timeoutId = setTimeout(() => {
+        setIsTemplateLoading(true);
+        // Prepare resume data in the format expected by the render endpoint
+        const resumeDataForRender = {
+          contact: resume.contact || {},
+          experience: resume.experience || [],
+          education: resume.education || [],
+          skills: resume.skills || [],
+          projects: resume.projects || [],
+          hobbies: resume.hobbies || [],
+          awards: resume.awards || [],
+        };
+        fetchTemplatePreview(resume.templateSlug, resumeDataForRender).finally(() => {
+          setIsTemplateLoading(false);
+        });
+      }, delay);
+
+      return () => clearTimeout(timeoutId);
+    }
+
+    // For logged-in users with resumeId
+    if (resumeId) {
+      // Check if template changed (immediate fetch) vs other data changes (debounced)
+      const isTemplateChange = prevTemplateSlugRef.current !== resume.templateSlug;
+      prevTemplateSlugRef.current = resume.templateSlug;
+
+      // For template changes, fetch immediately (user expects quick feedback)
+      // For other changes, use debounce to avoid rate limiting
+      const delay = isTemplateChange ? 50 : 2000; // 50ms for template change (almost immediate), 2s for other changes
+
+      const timeoutId = setTimeout(() => {
+        // Skip rate limiting for template changes to ensure immediate fetch
+        fetchServerPreview(isTemplateChange);
+      }, delay);
+
+      return () => clearTimeout(timeoutId);
+    }
   }, [
     resume.contact,
     resume.experience,
@@ -1888,6 +2175,7 @@ Your progress will be saved. Would you like to upgrade now?`
     resume.awards,
     resume.templateSlug,
     resumeId,
+    token,
   ]);
 
   // ---------- local preview (instant) ----------
@@ -2188,8 +2476,40 @@ Your progress will be saved. Would you like to upgrade now?`
     }
   }, [selectedTemplate?.slug]);
 
+  // Migrate localStorage data to account when user authenticates
+  useEffect(() => {
+    if (token && user && !resumeId) {
+      // User just authenticated, migrate localStorage data to account
+      const localData = getResumeFromLocal();
+      if (localData) {
+        console.log("🔄 Migrating localStorage data to account...");
+        // Clear localStorage after migration
+        clearResumeLocal();
+        // The resume state already has the data, so it will be saved to backend on next auto-save
+        // Trigger an immediate save
+        setTimeout(() => {
+          upsertResume();
+        }, 500);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, user]);
+
   return (
     <div style={S.page}>
+      {/* Export Gate Modal */}
+      <ExportGateModal
+        isOpen={showExportGate}
+        onClose={() => {
+          setShowExportGate(false);
+          setPendingExportFormat(null);
+        }}
+        resumeData={resume}
+        onContinueWithoutSaving={() => {
+          showToast("Please create an account to download your resume", { type: "info" });
+        }}
+      />
+
       {(isInitializing || exporting) && (
         <div
           style={{
@@ -2235,7 +2555,7 @@ Your progress will be saved. Would you like to upgrade now?`
           </div>
         </div>
       )}
-      {showTemplateDialog && startFresh && templates.length > 0 && (
+      {showTemplateDialog && shouldShowTemplateDialog && templates.length > 0 && (
         <div
           style={{
             position: "fixed",
@@ -2299,7 +2619,12 @@ Your progress will be saved. Would you like to upgrade now?`
                 type="button"
                 style={S.btnGhost}
                 onClick={() => {
-                  navigate("/dashboard");
+                  if (token) {
+                    navigate("/dashboard");
+                  } else {
+                    setShowTemplateDialog(false);
+                    navigate("/");
+                  }
                 }}>
                 Cancel
               </button>
@@ -2341,43 +2666,45 @@ Your progress will be saved. Would you like to upgrade now?`
             <h2 style={S.headerTitle}>{stepTitles[step - 1]}</h2>
             <div style={S.headerSub}>{stepSubtitles[step - 1]}</div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/dashboard")}
-            style={{
-            padding: "10px 18px",
-            fontSize: 14,
-            fontWeight: 500,
-            borderRadius: "8px",
-            background: "#ffffff",
-            color: "#2563eb",
-            border: "1px solid #bfdbfe",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            transition: "all 0.2s ease",
-              whiteSpace: "nowrap",
-            position: "relative",
-            overflow: "hidden",
-            boxShadow: "0 1px 2px rgba(37, 99, 235, 0.1)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#eff6ff";
-            e.currentTarget.style.borderColor = "#93c5fd";
-            e.currentTarget.style.transform = "translateX(-4px)";
-            e.currentTarget.style.boxShadow = "0 2px 8px rgba(37, 99, 235, 0.15)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "#ffffff";
-            e.currentTarget.style.borderColor = "#bfdbfe";
-            e.currentTarget.style.transform = "translateX(0)";
-            e.currentTarget.style.boxShadow = "0 1px 2px rgba(37, 99, 235, 0.1)";
-          }}>
-          <ArrowLeft size={16} />
-          <span>Back to Dashboard</span>
-          </button>
+          {token && (
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard")}
+              style={{
+              padding: "10px 18px",
+              fontSize: 14,
+              fontWeight: 500,
+              borderRadius: "8px",
+              background: "#ffffff",
+              color: "#2563eb",
+              border: "1px solid #bfdbfe",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              transition: "all 0.2s ease",
+                whiteSpace: "nowrap",
+              position: "relative",
+              overflow: "hidden",
+              boxShadow: "0 1px 2px rgba(37, 99, 235, 0.1)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#eff6ff";
+              e.currentTarget.style.borderColor = "#93c5fd";
+              e.currentTarget.style.transform = "translateX(-4px)";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(37, 99, 235, 0.15)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#ffffff";
+              e.currentTarget.style.borderColor = "#bfdbfe";
+              e.currentTarget.style.transform = "translateX(0)";
+              e.currentTarget.style.boxShadow = "0 1px 2px rgba(37, 99, 235, 0.1)";
+            }}>
+            <ArrowLeft size={16} />
+            <span>Back to Dashboard</span>
+            </button>
+          )}
         </div>
 
         {/* Stepper */}
@@ -2400,7 +2727,7 @@ Your progress will be saved. Would you like to upgrade now?`
           <label style={S.label}>Template *</label>
           <select
             value={resume.templateSlug || ""}
-            onChange={(e) => {
+            onChange={async (e) => {
               const newSlug = e.target.value;
               if (!newSlug) return;
               
@@ -2409,13 +2736,35 @@ Your progress will be saved. Would you like to upgrade now?`
               
               // Allow trial users to select premium templates
               // Download restrictions are enforced when attempting to download
-              setIsTemplateLoading(true);
               setSelectedTemplate(newTemplate);
+              
+              // Clear previous preview immediately for better UX
+              if (token && resumeId) {
+                setServerPreview("");
+                setServerPreviewUrl("");
+                // Cancel any in-flight preview request for the old template
+                if (previewAbortRef.current) {
+                  try {
+                    previewAbortRef.current.abort();
+                  } catch {
+                    /* ignore */
+                  }
+                  previewAbortRef.current = null;
+                }
+                previewInFlightRef.current = false;
+              }
+              
               setResume((r) => ({
                 ...r,
                 templateSlug: newSlug,
               }));
               markTyping();
+              
+              // Fetch preview for non-logged-in users (no resumeId)
+              if (!token && !resumeId) {
+                await fetchTemplatePreview(newSlug);
+              }
+              // For logged-in users, preview will be fetched via useEffect (with minimal delay for template changes)
             }}
             style={{
               ...S.input,
@@ -3967,47 +4316,37 @@ Your progress will be saved. Would you like to upgrade now?`
             <button
               data-variant="ghost"
               onClick={() => {
-                // Allow all users to preview, even trial users with premium templates
+                // Allow all users to preview and download
                 // Download restrictions are enforced in the modal
                 handleCompletion();
               }}
-              disabled={!resumeId}
+              disabled={!resume.templateSlug}
               style={{
                 padding: "8px 16px",
                 fontSize: 13,
                 fontWeight: 600,
                 borderRadius: "8px",
-                background: hasPaidPlan 
-                  ? "linear-gradient(135deg, #059669 0%, #047857 100%)" 
-                  : "linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)",
-                color: hasPaidPlan ? "white" : "#9ca3af",
-                border: hasPaidPlan ? "none" : "1px solid #d1d5db",
+                background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                color: "white",
+                border: "none",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "8px",
                 transition: "all 0.2s ease",
-                boxShadow: hasPaidPlan ? "0 2px 4px rgba(5, 150, 105, 0.2)" : "0 1px 2px rgba(0, 0, 0, 0.05)",
-                opacity: !resumeId ? 0.5 : 1,
+                boxShadow: "0 2px 4px rgba(5, 150, 105, 0.2)",
+                opacity: !resume.templateSlug ? 0.5 : 1,
+                cursor: !resume.templateSlug ? "not-allowed" : "pointer",
               }}>
-              {hasPaidPlan ? (
-                <>
-                  <Eye size={14} strokeWidth={2.5} />
-                  Preview & Download
-                </>
-              ) : (
-                <>
-                  <Eye size={14} strokeWidth={2.5} />
-                  <span style={{ color: "#4b5563" }}>Preview</span>
-                </>
-              )}
+              <Eye size={14} strokeWidth={2.5} />
+              Preview & Download
             </button>
           </div>
         </div>
         <div style={S.card}>
 
-          {/* Template Loading Overlay */}
-    {isTemplateLoading && (
+          {/* Template Loading Overlay - removed, no loader during content changes */}
+    {false && (
       <div
         style={{
           position: "absolute",
@@ -4042,7 +4381,7 @@ Your progress will be saved. Would you like to upgrade now?`
     )}
 
           {/* Show loader during initialization or when waiting for server preview */}
-          {isInitializing || (resumeId && !serverPreviewUrl && !serverPreview) ? (
+          {isInitializing || (resumeId && !serverPreviewUrl && !serverPreview) || (!resumeId && !token && !serverPreview && resume.templateSlug) ? (
             <div
               style={{
                 display: "flex",
@@ -4075,11 +4414,11 @@ Your progress will be saved. Would you like to upgrade now?`
               </style>
             </div>
           ) : serverPreviewUrl ? (
-            <iframe title="preview" src={serverPreviewUrl} style={S.iframe} onLoad={() => setIsTemplateLoading(false)}/>
+            <iframe title="preview" src={serverPreviewUrl} style={S.iframe} />
           ) : serverPreview ? (
-            <iframe title="preview" srcDoc={serverPreview} style={S.iframe} onLoad={() => setIsTemplateLoading(false)}/>
+            <iframe title="preview" srcDoc={serverPreview} style={S.iframe} />
           ) : (
-            <iframe title="preview" srcDoc={previewHtml} style={S.iframe} onLoad={() => setIsTemplateLoading(false)}/>
+            <iframe title="preview" srcDoc={previewHtml} style={S.iframe} />
           )}
         </div>
         <style jsx>{`
@@ -4106,33 +4445,87 @@ Your progress will be saved. Would you like to upgrade now?`
 
   // ---------- completion handler (after JSX for clarity) ----------
   async function handleCompletion() {
-    if (!resumeId) {
-      showAlert("Please save your resume first", "warning");
+    if (!resume.templateSlug) {
+      showAlert("Please select a template first", "warning");
       return;
     }
+    
     try {
-      // Persist latest changes/template before showing modal to match export
-      await upsertResume();
-      const [resumeRes, previewRes] = await Promise.all([
-        api.get(`/api/v1/resumes/${resumeId}`),
-        api
-          .get(`/api/v1/resumes/${resumeId}/preview`)
-          .catch((err) => ({ data: { html: previewHtml } })),
-      ]);
-      const resumeData = resumeRes.data?.data?.resume || resumeRes.data?.data;
-      // Prefer server-rendered HTML so modal matches export exactly
-      const finalPreviewHtml =
-        previewRes.data?.data?.html ||
-        previewRes.data?.html ||
-        previewHtml ||
-        "";
+      let finalPreviewHtml = "";
+      let resumeData = resume;
+      
+      if (resumeId && token) {
+        // Logged-in user with resume: fetch from server
+        try {
+          // Persist latest changes/template before showing modal to match export
+          await upsertResume();
+          const [resumeRes, previewRes] = await Promise.all([
+            api.get(`/api/v1/resumes/${resumeId}`),
+            api
+              .get(`/api/v1/resumes/${resumeId}/preview`)
+              .catch((err) => ({ data: { html: previewHtml } })),
+          ]);
+          resumeData = resumeRes.data?.data?.resume || resumeRes.data?.data || resume;
+          // Prefer server-rendered HTML so modal matches export exactly
+          finalPreviewHtml =
+            previewRes.data?.data?.html ||
+            previewRes.data?.html ||
+            previewHtml ||
+            "";
+        } catch (error) {
+          console.error("Failed to load resume data:", error);
+          // Fall through to use local data
+        }
+      }
+      
+      // For non-logged-in users or if server fetch failed, use template render API with resume data
+      if (!finalPreviewHtml && resume.templateSlug) {
+        try {
+          // Prepare resume data in the format expected by the render endpoint
+          const resumeDataForRender = {
+            contact: resume.contact || {},
+            experience: resume.experience || [],
+            education: resume.education || [],
+            skills: resume.skills || [],
+            projects: resume.projects || [],
+            hobbies: resume.hobbies || [],
+            awards: resume.awards || [],
+          };
+          
+          const response = await fetch(`/api/v1/templates/${resume.templateSlug}/render`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify(resumeDataForRender),
+          });
+          
+          if (response.ok) {
+            finalPreviewHtml = await response.text();
+          } else {
+            // Fall back to local preview
+            finalPreviewHtml = previewHtml || "";
+          }
+        } catch (error) {
+          console.error("Failed to fetch template preview:", error);
+          // Fall back to local preview
+          finalPreviewHtml = previewHtml || "";
+        }
+      }
+      
+      // If still no preview, use local preview
+      if (!finalPreviewHtml) {
+        finalPreviewHtml = previewHtml || "";
+      }
 
       setCompletionData({
         resume: resumeData,
         previewHtml: finalPreviewHtml,
         template: selectedTemplate,
-        resumeId,
+        resumeId: resumeId || null,
         canDownload,
+        token, // Pass token to check if user is logged in
       });
       setShowCompletionModal(true);
     } catch (error) {
@@ -4140,9 +4533,9 @@ Your progress will be saved. Would you like to upgrade now?`
       // Use local preview as fallback
       setCompletionData({
         resume,
-        previewHtml: previewHtml || "",
+        previewHtml: serverPreview || previewHtml || "",
         template: selectedTemplate,
-        resumeId,
+        resumeId: resumeId || null,
         canDownload,
       });
       setShowCompletionModal(true);
@@ -4474,7 +4867,8 @@ function CompletionModal({
   exportingFormat,
   navigate,
 }) {
-  const { resume, previewHtml, template, resumeId, canDownload } = data;
+  const { resume, previewHtml, template, resumeId, canDownload, token } = data;
+  const isPremiumTemplate = template?.category === "premium" || template?.category === "industry";
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
@@ -4765,19 +5159,46 @@ function CompletionModal({
              ) : (  
               <div style={{ textAlign: "center", padding: "32px 20px" }}>
               <Lock size={48} color="#dc2626" weight="bold" />
-              <p style={{ margin: "16px 0 8px", fontWeight: 600, fontSize: 16 }}>
-                Upgrade required to download
-              </p>
-              <p style={{ color: "#64748b", marginBottom: 20 }}>
-                Premium templates can be edited and previewed during your free trial,<br />
-                but downloading requires a paid plan.
-              </p>
-              <button
-                style={S.btnSolid}
-                onClick={() => navigate("/pricing")}
-              >
-                View Pricing Plans
-              </button>
+              {!token ? (
+                <>
+                  <p style={{ margin: "16px 0 8px", fontWeight: 600, fontSize: 16 }}>
+                    Sign up to download your resume
+                  </p>
+                  <p style={{ color: "#64748b", marginBottom: 20 }}>
+                    Create a free account to download your resume in PDF, Word, or TXT format.<br />
+                    You can continue editing your resume after signing up.
+                  </p>
+                  <button
+                    style={S.btnSolid}
+                    onClick={() => {
+                      // Save resume to localStorage before navigating
+                      saveResumeToLocal({
+                        ...resume,
+                        templateSlug: resume.templateSlug || template?.slug,
+                      });
+                      navigate("/signup");
+                    }}
+                  >
+                    Sign Up Now
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p style={{ margin: "16px 0 8px", fontWeight: 600, fontSize: 16 }}>
+                    Upgrade required to download
+                  </p>
+                  <p style={{ color: "#64748b", marginBottom: 20 }}>
+                    Premium templates can be edited and previewed during your free trial,<br />
+                    but downloading requires a paid plan.
+                  </p>
+                  <button
+                    style={S.btnSolid}
+                    onClick={() => navigate("/pricing")}
+                  >
+                    View Pricing Plans
+                  </button>
+                </>
+              )}
              </div>
                )}
             </div>

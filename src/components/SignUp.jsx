@@ -6,6 +6,8 @@ import linkedinIcon from "../assets/linkedin.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate, useLocation } from "react-router-dom";
 import { showToast } from "../lib/toast";
+import { api } from "../lib/api";
+import { migrateResumeToBackend, hasResumeLocal } from "../lib/localStorage.js";
 import {
   GoogleLogin,
   googleLogout,
@@ -109,6 +111,25 @@ const SignUp = () => {
                       showToast("Welcome! Signed up with Google", {
                         type: "success",
                       });
+                      
+                      // Migrate resume from localStorage to backend if available
+                      // (Google signup doesn't require email verification)
+                      if (hasResumeLocal()) {
+                        try {
+                          const migrationResult = await migrateResumeToBackend(api);
+                          if (migrationResult.success) {
+                            showToast("Your resume has been saved to your account!", {
+                              type: "success",
+                              duration: 3000,
+                            });
+                          } else if (migrationResult.error && !migrationResult.error.includes("limit")) {
+                            console.warn("Resume migration warning:", migrationResult.error);
+                          }
+                        } catch (err) {
+                          console.error("Failed to migrate resume:", err);
+                        }
+                      }
+                      
                       navigate("/dashboard");
                     } catch (e) {
                       console.error("Google login error:", e);

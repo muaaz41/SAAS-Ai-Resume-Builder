@@ -5,6 +5,7 @@ import { showToast } from "../lib/toast";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import { useAuth } from "../context/AuthContext.jsx";
+import { migrateResumeToBackend, hasResumeLocal } from "../lib/localStorage.js";
 
 export default function VerifyEmailResult() {
   const [status, setStatus] = useState("pending");
@@ -27,6 +28,26 @@ export default function VerifyEmailResult() {
         await refreshUser();
         setStatus("success");
         showToast("Email verified!", { type: "success" });
+        
+        // Migrate resume from localStorage to backend if available
+        if (hasResumeLocal()) {
+          try {
+            const migrationResult = await migrateResumeToBackend(api);
+            if (migrationResult.success) {
+              showToast("Your resume has been saved to your account!", {
+                type: "success",
+                duration: 3000,
+              });
+            } else if (migrationResult.error && !migrationResult.error.includes("limit")) {
+              // Only show error if it's not a limit error (limit errors are expected)
+              console.warn("Resume migration warning:", migrationResult.error);
+            }
+          } catch (err) {
+            console.error("Failed to migrate resume:", err);
+            // Don't block user flow if migration fails
+          }
+        }
+        
         // Check for post-verification redirect
         const postVerificationRedirect = sessionStorage.getItem("postVerificationRedirect");
         const postVerificationTemplateSlug = sessionStorage.getItem("postVerificationTemplateSlug");

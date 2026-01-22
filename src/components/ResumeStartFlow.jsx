@@ -53,17 +53,7 @@ const ResumeStartFlow = () => {
   }, []);
 
   const handleSelectTemplate = (template) => {
-    // Check if user needs to sign in
-    if (!token) {
-      sessionStorage.setItem("pendingTemplateSlug", template.slug);
-      sessionStorage.setItem("pendingFlow", "builder");
-      navigate("/signin", {
-        state: { redirectTo: "/builder", templateSlug: template.slug },
-      });
-      return;
-    }
-
-    // User is logged in, proceed to builder
+    // Proceed to builder for both logged in and non-logged in users
     navigate("/builder", {
       state: {
         startFresh: true,
@@ -73,13 +63,7 @@ const ResumeStartFlow = () => {
   };
 
   const handleUploadClick = () => {
-    if (!token) {
-      sessionStorage.setItem("pendingFlow", "upload");
-      navigate("/signin", {
-        state: { redirectTo: "/dashboard", action: "upload" },
-      });
-      return;
-    }
+    // Allow both logged in and non-logged in users to upload
     setShowUpload(true);
   };
 

@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../lib/api.js";
 import { showToast } from "../lib/toast";
 import { XCircle } from "@phosphor-icons/react";
+import { migrateResumeToBackend, hasResumeLocal } from "../lib/localStorage.js";
 
 export default function LinkedInCallback() {
   const { loginWithLinkedIn, token } = useAuth();
@@ -87,6 +88,23 @@ export default function LinkedInCallback() {
           }
         } else {
           // Regular login flow
+          // Migrate resume from localStorage to backend if available
+          if (hasResumeLocal()) {
+            try {
+              const migrationResult = await migrateResumeToBackend(api);
+              if (migrationResult.success) {
+                showToast("Your resume has been saved to your account!", {
+                  type: "success",
+                  duration: 3000,
+                });
+              } else if (migrationResult.error && !migrationResult.error.includes("limit")) {
+                console.warn("Resume migration warning:", migrationResult.error);
+              }
+            } catch (err) {
+              console.error("Failed to migrate resume:", err);
+            }
+          }
+          
           navigate("/dashboard");
         }
       } catch (e) {

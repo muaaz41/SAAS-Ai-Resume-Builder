@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 import { showToast } from "../lib/toast";
+import { migrateResumeToBackend, hasResumeLocal } from "../lib/localStorage.js";
 import {
   GoogleLogin,
   googleLogout,
@@ -30,6 +31,26 @@ const SignIn = () => {
     try {
       await login(email, password);
       showToast("Welcome back!", { type: "success", duration: 2500 });
+      
+      // Migrate resume from localStorage to backend if available
+      if (hasResumeLocal()) {
+        try {
+          const migrationResult = await migrateResumeToBackend(api);
+          if (migrationResult.success) {
+            showToast("Your resume has been saved to your account!", {
+              type: "success",
+              duration: 3000,
+            });
+          } else if (migrationResult.error && !migrationResult.error.includes("limit")) {
+            // Only show error if it's not a limit error (limit errors are expected)
+            console.warn("Resume migration warning:", migrationResult.error);
+          }
+        } catch (err) {
+          console.error("Failed to migrate resume:", err);
+          // Don't block user flow if migration fails
+        }
+      }
+      
       navigate("/dashboard");
     } catch (err) {
       let msg;
@@ -171,6 +192,24 @@ const SignIn = () => {
                     showToast("Welcome! Signed in with Google", {
                       type: "success",
                     });
+                    
+                    // Migrate resume from localStorage to backend if available
+                    if (hasResumeLocal()) {
+                      try {
+                        const migrationResult = await migrateResumeToBackend(api);
+                        if (migrationResult.success) {
+                          showToast("Your resume has been saved to your account!", {
+                            type: "success",
+                            duration: 3000,
+                          });
+                        } else if (migrationResult.error && !migrationResult.error.includes("limit")) {
+                          console.warn("Resume migration warning:", migrationResult.error);
+                        }
+                      } catch (err) {
+                        console.error("Failed to migrate resume:", err);
+                      }
+                    }
+                    
                     navigate("/dashboard");
                   } catch (e) {
                     console.error("Google login error:", e);

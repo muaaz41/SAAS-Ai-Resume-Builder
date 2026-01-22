@@ -31,29 +31,9 @@ function App() {
       <Route path="/auth/verify" element={<VerifyEmailResult />} />
       <Route path="/auth/forgot-password" element={<ForgotPassword />} />
       <Route path="/auth/reset-password" element={<ResetPassword />} />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute requireVerified={true}>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin"
-        element={
-          
-            <AdminPanel />
-        }
-      />
-      <Route
-        path="/builder"
-        element={
-          <ProtectedRoute requireVerified={true}>
-            <Builder />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/admin" element={<AdminPanel />} />
+      <Route path="/builder" element={<Builder />} />
       <Route path="/auth/linkedin/callback" element={<LinkedInCallback />} />
       <Route path="/ats-checker" element={<ATSChecker />} />
       <Route path="/pricing" element={<Pricing />} />

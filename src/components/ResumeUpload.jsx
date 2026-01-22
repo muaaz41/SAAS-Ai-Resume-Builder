@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { api } from "../lib/api.js";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext.jsx";
 import { FileText } from "@phosphor-icons/react";
 
 export default function ResumeUpload({ onClose, selectedTemplateSlug }) {
 const navigate = useNavigate();
+const { token } = useAuth();
 const [file, setFile] = useState(null);
 const [dragActive, setDragActive] = useState(false);
 const [parsing, setParsing] = useState(false);
@@ -276,6 +278,66 @@ if (!file) return;
 setImporting(true);
 setError("");
 
+// Use selected template or fallback
+const templateSlug =
+selectedTemplate?.slug || selectedTemplateSlug || "modern-flat";
+
+// If user is not authenticated, use parsed data directly
+if (!token) {
+  if (!parsedData) {
+    setError("Please parse the resume first");
+    setImporting(false);
+    return;
+  }
+
+  // Clean up parsed data similar to backend
+  const cleanExperience = (parsedData.experience || []).map((e) => ({
+    ...e,
+    startDate: e.startDate && e.startDate !== "null" ? e.startDate : undefined,
+    endDate: e.endDate && e.endDate !== "null" && !e.current ? e.endDate : undefined,
+  }));
+
+  const cleanEducation = (parsedData.education || []).map((e) => ({
+    ...e,
+    location: e.location || "",
+    startDate: e.startDate && e.startDate !== "null" ? e.startDate : undefined,
+    endDate: e.endDate && e.endDate !== "null" ? e.endDate : undefined,
+  }));
+
+  // Store parsed data in sessionStorage for builder
+  sessionStorage.setItem(
+    "pendingResumeData",
+    JSON.stringify({
+      contact: parsedData.contact || {},
+      experience: cleanExperience,
+      education: cleanEducation,
+      skills: parsedData.skills || [],
+      projects: parsedData.projects || [],
+      awards: parsedData.awards || [],
+      hobbies: parsedData.hobbies || [],
+      title: `${parsedData.contact?.fullName || "Imported"} Resume`,
+      templateSlug: templateSlug,
+    })
+  );
+  sessionStorage.setItem("pendingTemplateSlug", templateSlug);
+
+  // Close modal first
+  if (onClose) onClose();
+  // Small delay to ensure state is clean before navigation
+  setTimeout(() => {
+    navigate("/builder", {
+      state: {
+        templateSlug: templateSlug,
+        startFresh: false,
+      },
+      replace: true,
+    });
+  }, 100);
+  setImporting(false);
+  return;
+}
+
+// User is authenticated, proceed with normal import flow
 try {
 // Check resume limit before importing
 try {
@@ -293,10 +355,6 @@ try {
 
 const formData = new FormData();
 formData.append("file", file);
-
-// Use selected template or fallback
-const templateSlug =
-selectedTemplate?.slug || selectedTemplateSlug || "modern-flat";
 formData.append("templateSlug", templateSlug);
 
 const res = await api.post("/api/v1/files/import", formData, {

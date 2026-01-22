@@ -1614,46 +1614,15 @@ export default function Builder() {
     setExporting(true);
     setExportingFormat(format);
     try {
-      await upsertResume();
-      // small delay to allow server to persist before rendering
-      await new Promise((r) => setTimeout(r, 300));
+      // Only save if there are unsaved changes (check if saving is needed)
+      const hasUnsavedChanges = saving || lastSaveAtRef.current === 0 || (Date.now() - lastSaveAtRef.current) > 5000;
+      if (hasUnsavedChanges) {
+        await upsertResume();
+        // Reduce delay from 300ms to 100ms since we optimized the backend
+        await new Promise((r) => setTimeout(r, 100));
+      }
 
       console.log(`Exporting resume ${resumeId} as ${format}...`);
-      try {
-        // Fetch what the server currently has to confirm sections are present
-        const srv = await api.get(`/api/v1/resumes/${resumeId}`);
-        const srvData = srv?.data?.data || {};
-        const srvResume = srvData.resume || srvData;
-        console.log("[Export] Server resume template:", srvData.templateSlug || srvResume.template?.slug || 'undefined');
-        console.log("[Export] Server resume data:", srvResume);
-        console.log(
-          "[Export] Server contact summary length:",
-          (srvResume.contact?.summary || "").length
-        );
-        console.log(
-          "[Export] Server experience count:",
-          Array.isArray(srvResume.experience) ? srvResume.experience.length : 0
-        );
-        console.log(
-          "[Export] Server education count:",
-          Array.isArray(srvResume.education) ? srvResume.education.length : 0
-        );
-        console.log(
-          "[Export] Server skills count:",
-          Array.isArray(srvResume.skills) ? srvResume.skills.length : 0
-        );
-        if (format === "docx") {
-          console.log(
-            "[Export] DOCX debug — first experience sample:",
-            srvResume.experience?.[0]
-          );
-        }
-      } catch (e) {
-        console.warn(
-          "[Export] Could not fetch server resume before export:",
-          e?.message || e
-        );
-      }
 
       // Build URLs (direct backend vs proxied)
       const backendOrigin =
@@ -1670,11 +1639,11 @@ export default function Builder() {
 
       let res;
       try {
-        // In dev, try the direct backend first to bypass the Vite proxy
+        // Try the direct backend URL first (faster in development)
         const urlToUse = isLocal ? directUrl : proxiedUrl;
         res = await api.get(urlToUse, {
           responseType: format === "txt" ? "text" : "blob",
-          timeout: 60000,
+          timeout: 30000, // Reduced from 60s to 30s since we optimized PDF generation
           withCredentials: true,
         });
       } catch (firstErr) {
@@ -1682,10 +1651,10 @@ export default function Builder() {
           "Direct export failed, retrying via proxied URL:",
           firstErr?.message || firstErr
         );
-        // Fallback to proxied path
+        // Fallback to proxied path with shorter timeout
         res = await api.get(proxiedUrl, {
           responseType: format === "txt" ? "text" : "blob",
-          timeout: 60000,
+          timeout: 30000, // Reduced timeout
           withCredentials: true,
         });
       }
@@ -4421,7 +4390,7 @@ Your progress will be saved. Would you like to upgrade now?`
             <iframe title="preview" srcDoc={previewHtml} style={S.iframe} />
           )}
         </div>
-        <style jsx>{`
+        <style>{`
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }

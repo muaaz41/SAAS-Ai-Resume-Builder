@@ -204,6 +204,7 @@ export default function Builder() {
   const previewAbortRef = useRef(null); // AbortController for preview
   const previewInFlightRef = useRef(false);
   const previewRetryTimerRef = useRef(null);
+  const previewRequestIdRef = useRef(0); // Incrementing id to ignore stale preview responses
   const saveInFlightRef = useRef(false);
   const saveRetryTimerRef = useRef(null);
   const prevTemplateSlugRef = useRef(null); // Track previous template to detect changes
@@ -1923,7 +1924,10 @@ Your progress will be saved. Would you like to upgrade now?`
   // ---------- Fetch template preview for non-logged-in users ----------
   const fetchTemplatePreview = async (templateSlug, resumeData = null) => {
     if (!templateSlug) return;
-    
+    // mark this preview request with an incrementing id so we can ignore stale responses
+    previewRequestIdRef.current += 1;
+    const requestId = previewRequestIdRef.current;
+
     try {
       let response;
       
@@ -1955,12 +1959,15 @@ Your progress will be saved. Would you like to upgrade now?`
       }
 
       const htmlContent = await response.text();
+      // Ignore if a newer preview request has started
+      if (requestId !== previewRequestIdRef.current) return;
       setServerPreview(htmlContent);
       setServerPreviewUrl(""); // Clear URL if using HTML directly
     } catch (error) {
       console.error("Failed to fetch template preview:", error);
       // Fall back to local preview
-      setServerPreview("");
+      // Only clear if this is the latest request
+      if (previewRequestIdRef.current === requestId) setServerPreview("");
     } finally {
       setIsTemplateLoading(false);
     }
@@ -2012,6 +2019,10 @@ Your progress will be saved. Would you like to upgrade now?`
       previewAbortRef.current = null;
     }
 
+    // mark this preview request with an incrementing id so we can ignore stale responses
+    previewRequestIdRef.current += 1;
+    const requestId = previewRequestIdRef.current;
+
     const controller = new AbortController();
     previewAbortRef.current = controller;
     previewInFlightRef.current = true;
@@ -2023,12 +2034,17 @@ Your progress will be saved. Would you like to upgrade now?`
       });
       const html = r.data?.data?.html || r.data?.html || "";
       const url = r.data?.data?.url || r.data?.url || "";
-      if (url) {
-        setServerPreviewUrl(url);
-        setServerPreview("");
-      } else if (html) {
-        setServerPreviewUrl("");
-        setServerPreview(html);
+      if (requestId === previewRequestIdRef.current) {
+        if (url) {
+          setServerPreviewUrl(url);
+          setServerPreview("");
+        } else if (html) {
+          setServerPreviewUrl("");
+          setServerPreview(html);
+        }
+      } else {
+        // discard stale response
+        console.log("➡️ Discarding stale server preview response");
       }
     } catch (err) {
       if (err?.name !== "CanceledError" && err?.message !== "canceled") {
@@ -2728,12 +2744,41 @@ Your progress will be saved. Would you like to upgrade now?`
                 templateSlug: newSlug,
               }));
               markTyping();
-              
-              // Fetch preview for non-logged-in users (no resumeId)
-              if (!token && !resumeId) {
-                await fetchTemplatePreview(newSlug);
+
+              // Fetch preview immediately using the render endpoint and current resume data.
+              // We call `fetchTemplatePreview` with `resumeData` so the preview doesn't depend
+              // on the async state update for `resume.templateSlug`.
+              const resumeDataForRender = {
+                contact: resume.contact || {},
+                experience: resume.experience || [],
+                education: resume.education || [],
+                skills: resume.skills || [],
+                projects: resume.projects || [],
+                hobbies: resume.hobbies || [],
+                awards: resume.awards || [],
+              };
+
+              try {
+                await fetchTemplatePreview(newSlug, resumeDataForRender);
+              } catch (err) {
+                // ignore preview errors; background preview logic may retry
               }
-              // For logged-in users, preview will be fetched via useEffect (with minimal delay for template changes)
+              // If the user is authenticated and we have a resumeId, persist the template change
+              // immediately on the server and then request a server-rendered preview. This ensures
+              // the server preview matches the selected template instead of briefly reverting
+              // to the old template while the backend update completes.
+              if (token && resumeId) {
+                try {
+                  await api.patch(`/api/v1/resumes/${resumeId}`, {
+                    templateSlug: newSlug,
+                    template: newSlug,
+                  });
+                  // After the server knows about the new template, fetch the preview (skip rate-limit)
+                  await fetchServerPreview(true);
+                } catch (err) {
+                  console.warn("Failed to persist template change immediately:", err);
+                }
+              }
             }}
             style={{
               ...S.input,

@@ -19,6 +19,7 @@ const ResumeStartFlow = () => {
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [previewTemplate, setPreviewTemplate] = useState(null);
   const [importingLinkedIn, setImportingLinkedIn] = useState(false);
 
   useEffect(() => {
@@ -53,7 +54,13 @@ const ResumeStartFlow = () => {
   }, []);
 
   const handleSelectTemplate = (template) => {
-    // Proceed to builder for both logged in and non-logged in users
+    // Show preview modal instead of navigating directly
+    setPreviewTemplate(template);
+    setSelectedTemplate(null); // Close template selection modal
+  };
+
+  const handleContinueToBuilder = (template) => {
+    // Navigate to builder with selected template
     navigate("/builder", {
       state: {
         startFresh: true,
@@ -471,11 +478,300 @@ const ResumeStartFlow = () => {
             onImport={handleUploadComplete}
           />
         )}
+
+        {/* Template Preview Modal */}
+        {previewTemplate && (
+          <TemplatePreviewModal
+            template={previewTemplate}
+            onClose={() => setPreviewTemplate(null)}
+            onContinue={handleContinueToBuilder}
+          />
+        )}
       </main>
       <Footer />
     </div>
   );
 };
+
+// Template Preview Modal Component
+function TemplatePreviewModal({ template, onClose, onContinue }) {
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function createPreview() {
+      try {
+        setLoading(true);
+
+        if (!template?.slug) {
+          console.error("No template available for preview");
+          setPreviewHtml("<div>No template available for preview</div>");
+          setLoading(false);
+          return;
+        }
+
+        // Use the public template preview endpoint
+        try {
+          const previewResponse = await fetch(
+            `/api/v1/templates/${template.slug}/preview`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "text/html",
+              },
+              credentials: "include",
+            }
+          );
+
+          if (!previewResponse.ok) {
+            throw new Error(
+              `Preview failed: ${previewResponse.status} ${previewResponse.statusText}`
+            );
+          }
+
+          const htmlContent = await previewResponse.text();
+          setPreviewHtml(htmlContent);
+          setLoading(false);
+        } catch (previewErr) {
+          console.error("Template preview failed:", previewErr);
+          setPreviewHtml(`<div style="padding: 20px; text-align: center;">
+            <h3>Preview Unavailable</h3>
+            <p>Unable to load template preview. Please try again later.</p>
+            <p style="color: #666; font-size: 12px;">${previewErr.message}</p>
+          </div>`);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Preview failed:", error);
+        setPreviewHtml("<div>Failed to load preview</div>");
+        setLoading(false);
+      }
+    }
+
+    createPreview();
+  }, [template?.slug]);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0, 0, 0, 0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: "20px",
+        backdropFilter: "blur(4px)",
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#ffffff",
+          borderRadius: "20px",
+          width: "95vw",
+          maxWidth: "900px",
+          height: "92vh",
+          maxHeight: "1000px",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          boxShadow: "0 25px 60px rgba(0, 0, 0, 0.3)",
+          border: "1px solid #e2e8f0",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "20px 28px",
+            background: "#f8fafc",
+            borderBottom: "1px solid #e2e8f0",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          <div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "1.5rem",
+                fontWeight: "700",
+                color: "#0f172a",
+              }}
+            >
+              {template?.name || "Template Preview"}
+            </h2>
+            <p
+              style={{
+                margin: "6px 0 0",
+                fontSize: "0.875rem",
+                color: "#64748b",
+              }}
+            >
+              {template?.name} • Live Preview
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: "2rem",
+              cursor: "pointer",
+              color: "#64748b",
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Preview Body */}
+        <div
+          style={{
+            flex: 1,
+            overflow: "auto",
+            background: "#f1f5f9",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "flex-start",
+            padding: "32px 20px",
+          }}
+        >
+          {loading ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                color: "#64748b",
+              }}
+            >
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: "999px",
+                  border: "4px solid #e5e7eb",
+                  borderTopColor: "#2563eb",
+                  animation: "spin 1s linear infinite",
+                  marginBottom: 16,
+                }}
+              />
+              <div style={{ fontSize: "1rem", fontWeight: "600" }}>
+                Loading preview...
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                width: "210mm",
+                minHeight: "297mm",
+                background: "#fff",
+                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
+                borderRadius: "8px",
+                overflow: "hidden",
+                border: "1px solid #d1d5db",
+              }}
+            >
+              <iframe
+                srcDoc={previewHtml}
+                title="Resume Preview"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  minHeight: "297mm",
+                  border: "none",
+                  background: "#fff",
+                  display: "block",
+                }}
+                sandbox="allow-same-origin allow-scripts"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: "20px 28px",
+            background: "#f8fafc",
+            borderTop: "1px solid #e2e8f0",
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 12,
+            flexShrink: 0,
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              padding: "10px 20px",
+              borderRadius: "12px",
+              border: "1px solid #cbd5e1",
+              background: "#fff",
+              color: "#475569",
+              fontWeight: "600",
+              fontSize: "0.875rem",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+          >
+            Close
+          </button>
+          <button
+            onClick={() => onContinue?.(template)}
+            style={{
+              padding: "10px 24px",
+              borderRadius: "12px",
+              background: "#2563eb",
+              color: "#fff",
+              border: "none",
+              fontWeight: "600",
+              fontSize: "0.875rem",
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow = "0 6px 16px rgba(37, 99, 235, 0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 4px 12px rgba(37, 99, 235, 0.3)";
+            }}
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 export default ResumeStartFlow;
 

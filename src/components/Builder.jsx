@@ -4271,12 +4271,12 @@ Your progress will be saved. Would you like to upgrade now?`
 
         {/* Navigation buttons */}
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-          <button
+          {/* <button
             type="button"
             style={S.btnGhost}
             onClick={() => setStep((s) => Math.max(1, s - 1))}>
             Back
-          </button>
+          </button> */}
           <button
             type="button"
             style={S.btnSolid}

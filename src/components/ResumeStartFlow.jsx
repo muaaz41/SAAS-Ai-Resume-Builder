@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../lib/api.js";
 import { showToast } from "../lib/toast";
 import ResumeUpload from "./ResumeUpload.jsx";
+import TemplateCard from "./TemplateCard.jsx";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import { Briefcase } from "@phosphor-icons/react";
@@ -18,8 +19,8 @@ const ResumeStartFlow = () => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [previewTemplate, setPreviewTemplate] = useState(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [importingLinkedIn, setImportingLinkedIn] = useState(false);
 
   useEffect(() => {
@@ -52,12 +53,6 @@ const ResumeStartFlow = () => {
     };
     fetchTemplates();
   }, []);
-
-  const handleSelectTemplate = (template) => {
-    // Show preview modal instead of navigating directly
-    setPreviewTemplate(template);
-    setSelectedTemplate(null); // Close template selection modal
-  };
 
   const handleContinueToBuilder = (template) => {
     // Navigate to builder with selected template
@@ -243,8 +238,7 @@ const ResumeStartFlow = () => {
             }}
             onClick={() => {
               if (templates.length > 0) {
-                // Show template selection
-                setSelectedTemplate("select");
+                setShowTemplateModal(true);
               }
             }}>
             <div
@@ -330,8 +324,8 @@ const ResumeStartFlow = () => {
           </div>
         </div>
 
-        {/* Template Selection Modal */}
-        {selectedTemplate === "select" && (
+        {/* Template selection modal – template tiles (like dashboard) */}
+        {showTemplateModal && (
           <div
             style={{
               position: "fixed",
@@ -342,127 +336,127 @@ const ResumeStartFlow = () => {
               justifyContent: "center",
               zIndex: 50,
               padding: "20px",
-            }}>
+              overflow: "auto",
+            }}
+            onClick={() => setShowTemplateModal(false)}
+          >
             <div
               style={{
                 background: "white",
-                borderRadius: "16px",
+                borderRadius: "20px",
                 padding: "32px",
-                maxWidth: "900px",
+                maxWidth: "1100px",
                 width: "100%",
                 maxHeight: "90vh",
                 overflow: "auto",
-              }}>
+                boxShadow: "0 25px 60px rgba(0, 0, 0, 0.2)",
+                border: "1px solid #e2e8f0",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   marginBottom: "24px",
-                }}>
+                }}
+              >
                 <h2
                   style={{
                     fontSize: "1.75rem",
                     fontWeight: "700",
                     color: "#0f172a",
-                  }}>
+                  }}
+                >
                   Choose a Template
                 </h2>
                 <button
-                  onClick={() => setSelectedTemplate(null)}
+                  onClick={() => setShowTemplateModal(false)}
                   style={{
                     background: "none",
                     border: "none",
-                    fontSize: "24px",
+                    fontSize: "28px",
                     cursor: "pointer",
                     color: "#64748b",
-                  }}>
+                    lineHeight: 1,
+                    padding: "4px",
+                  }}
+                >
                   ×
                 </button>
               </div>
+              <p
+                style={{
+                  fontSize: "0.9375rem",
+                  color: "#64748b",
+                  marginBottom: "24px",
+                }}
+              >
+                Preview any template or use it to start building your resume.
+              </p>
 
               {loading ? (
-                <div style={{ textAlign: "center", padding: "40px" }}>
-                  <div
-                    style={{
-                      width: "40px",
-                      height: "40px",
-                      border: "4px solid #e5e7eb",
-                      borderTopColor: "#2563eb",
-                      borderRadius: "50%",
-                      margin: "0 auto",
-                      animation: "spin 0.9s linear infinite",
-                    }}
-                  />
-                  <style>
-                    {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
-                  </style>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                    gap: "20px",
+                  }}
+                >
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div
+                      key={i}
+                      style={{
+                        height: 400,
+                        background: "linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)",
+                        borderRadius: 20,
+                        border: "1px solid #e2e8f0",
+                        animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : templates.length === 0 ? (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "48px 20px",
+                    background: "#f8fafc",
+                    borderRadius: 16,
+                    border: "1px solid #e2e8f0",
+                  }}
+                >
+                  <p style={{ fontSize: "1rem", color: "#64748b", margin: 0 }}>
+                    No templates available. Please try again later.
+                  </p>
                 </div>
               ) : (
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                    gap: "16px",
-                  }}>
-                  {templates.map((template) => {
+                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                    gap: "20px",
+                  }}
+                >
+                  {templates.map((t) => {
                     const isPremium =
-                      template.category === "premium" ||
-                      template.category === "industry";
+                      t.category === "premium" || t.category === "industry";
                     return (
-                      <div
-                        key={template.slug}
-                        onClick={() => handleSelectTemplate(template)}
-                        style={{
-                          border: "2px solid #e5e7eb",
-                          borderRadius: "12px",
-                          padding: "16px",
-                          cursor: "pointer",
-                          transition: "all 0.2s",
-                          background: "white",
+                      <TemplateCard
+                        key={t.slug}
+                        template={t}
+                        isPremium={isPremium}
+                        locked={false}
+                        onSelect={() => {
+                          setShowTemplateModal(false);
+                          handleContinueToBuilder(t);
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = "#2563eb";
-                          e.currentTarget.style.transform = "translateY(-2px)";
+                        onPreview={(template) => {
+                          setShowTemplateModal(false);
+                          setPreviewTemplate(template);
                         }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = "#e5e7eb";
-                          e.currentTarget.style.transform = "translateY(0)";
-                        }}>
-                        {isPremium && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: "8px",
-                              right: "8px",
-                              background: "#fbbf24",
-                              color: "white",
-                              padding: "2px 8px",
-                              borderRadius: "4px",
-                              fontSize: "10px",
-                              fontWeight: "bold",
-                            }}>
-                            PREMIUM
-                          </div>
-                        )}
-                        <div
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: "600",
-                            color: "#0f172a",
-                            marginTop: "8px",
-                          }}>
-                          {template.name || template.slug}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            color: "#64748b",
-                            marginTop: "4px",
-                          }}>
-                          {template.category || "free"}
-                        </div>
-                      </div>
+                      />
                     );
                   })}
                 </div>

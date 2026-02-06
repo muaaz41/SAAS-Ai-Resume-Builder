@@ -11,15 +11,37 @@ const STORAGE_VERSION = 1;
  */
 export const saveResumeToLocal = (resumeData) => {
   try {
+    console.log("💾 saveResumeToLocal called with data:", {
+      title: resumeData?.title,
+      templateSlug: resumeData?.templateSlug,
+      hasContact: !!resumeData?.contact,
+      experienceCount: resumeData?.experience?.length || 0,
+      educationCount: resumeData?.education?.length || 0,
+    });
+    
     const dataToSave = {
       ...resumeData,
       lastSaved: new Date().toISOString(),
       version: STORAGE_VERSION,
     };
+    
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    console.log("✅ Successfully saved resume to localStorage");
+    
+    // Verify it was saved
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      console.log("✅ Verified save - localStorage contains:", {
+        title: parsed.title,
+        templateSlug: parsed.templateSlug,
+        lastSaved: parsed.lastSaved,
+      });
+    }
+    
     return true;
   } catch (error) {
-    console.warn("Failed to save resume to localStorage:", error);
+    console.error("❌ Failed to save resume to localStorage:", error);
     return false;
   }
 };
@@ -122,20 +144,41 @@ export const migrateResumeToBackend = async (api) => {
   try {
     // Get resume data from localStorage
     const localResumeData = getResumeFromLocal();
-    if (!localResumeData || !localResumeData.templateSlug) {
+    if (!localResumeData) {
+      console.warn("⚠️ No resume data found in localStorage");
       return { success: false, error: "No resume data found in localStorage" };
+    }
+    
+    if (!localResumeData.templateSlug) {
+      console.warn("⚠️ Resume data found but missing templateSlug:", localResumeData);
+      return { success: false, error: "Resume data is missing template information" };
     }
 
     // Debug: Log what we're migrating
-    console.log("🔄 Migrating resume data:", {
+    console.log("🔄 Migrating resume data from localStorage:", {
+      title: localResumeData.title,
+      templateSlug: localResumeData.templateSlug,
       hasContact: !!localResumeData.contact,
+      contactFields: localResumeData.contact ? Object.keys(localResumeData.contact) : [],
+      contactData: localResumeData.contact ? {
+        fullName: localResumeData.contact.fullName,
+        email: localResumeData.contact.email,
+        hasSummary: !!(localResumeData.contact.summary || localResumeData.contact.professionalSummary),
+      } : null,
       experienceCount: localResumeData.experience?.length || 0,
+      experienceSample: localResumeData.experience?.[0] ? {
+        title: localResumeData.experience[0].title,
+        company: localResumeData.experience[0].company,
+      } : null,
       educationCount: localResumeData.education?.length || 0,
+      educationSample: localResumeData.education?.[0] ? {
+        degree: localResumeData.education[0].degree,
+        school: localResumeData.education[0].school,
+      } : null,
       skillsCount: localResumeData.skills?.length || 0,
       projectsCount: localResumeData.projects?.length || 0,
       hobbiesCount: localResumeData.hobbies?.length || 0,
       awardsCount: localResumeData.awards?.length || 0,
-      templateSlug: localResumeData.templateSlug,
     });
 
     // Check resume limit first
@@ -173,26 +216,31 @@ export const migrateResumeToBackend = async (api) => {
 
     // Prepare payload similar to Builder's cleanResumeData
     // Always include all fields to ensure complete data migration
+    // Preserve ALL contact fields from localStorage, don't lose any data
+    const contactData = localResumeData.contact || {};
     const payload = {
       title: localResumeData.title || "My Resume",
       templateSlug: localResumeData.templateSlug,
       template: localResumeData.templateSlug, // Some backends expect both
       contact: {
-        fullName: localResumeData.contact?.fullName || "",
-        email: localResumeData.contact?.email || "",
-        phone: localResumeData.contact?.phone || "",
-        location: localResumeData.contact?.location || "",
-        address: localResumeData.contact?.address || "",
-        website: localResumeData.contact?.website || "",
-        github: localResumeData.contact?.github || "",
-        linkedin: localResumeData.contact?.linkedin || "",
-        portfolioLink: localResumeData.contact?.portfolioLink || "",
-        headline: localResumeData.contact?.headline || "",
-        summary: localResumeData.contact?.summary || "",
-        summaryText: stripHtml(localResumeData.contact?.summary || ""),
-        professionalSummary: localResumeData.contact?.professionalSummary || localResumeData.contact?.summary || "",
+        // Preserve all existing contact fields first
+        ...contactData,
+        // Then ensure all required fields are present (even if empty)
+        fullName: contactData.fullName || "",
+        email: contactData.email || "",
+        phone: contactData.phone || "",
+        location: contactData.location || "",
+        address: contactData.address || "",
+        website: contactData.website || "",
+        github: contactData.github || "",
+        linkedin: contactData.linkedin || "",
+        portfolioLink: contactData.portfolioLink || "",
+        headline: contactData.headline || "",
+        summary: contactData.summary || "",
+        summaryText: stripHtml(contactData.summary || ""),
+        professionalSummary: contactData.professionalSummary || contactData.summary || "",
         professionalSummaryText: stripHtml(
-          localResumeData.contact?.professionalSummary || localResumeData.contact?.summary || ""
+          contactData.professionalSummary || contactData.summary || ""
         ),
       },
       // Initialize all arrays to ensure they're always included
@@ -204,9 +252,11 @@ export const migrateResumeToBackend = async (api) => {
       awards: [],
     };
 
-    // Add experience - include ALL entries with any data to preserve user's work
+    // Add experience - preserve ALL entries, even if empty (user may fill them later)
+    // Only filter out null/undefined entries, not empty strings
     if (localResumeData.experience && Array.isArray(localResumeData.experience)) {
       payload.experience = localResumeData.experience
+        .filter((e) => e != null && typeof e === "object") // Only filter out null/undefined/non-objects
         .map(cleanDates)
         .map((e) => {
           const exp = {
@@ -214,54 +264,38 @@ export const migrateResumeToBackend = async (api) => {
             company: e.company || "",
             location: e.location || "",
             current: e.current || false,
-            bullets: e.bullets || [],
+            bullets: Array.isArray(e.bullets) ? e.bullets : [],
           };
           if (e.startDate) exp.startDate = e.startDate;
           if (e.endDate && !e.current) exp.endDate = e.endDate;
           // Include descriptionHtml if present (for rich text)
           if (e.descriptionHtml) exp.descriptionHtml = e.descriptionHtml;
           return exp;
-        })
-        // Include entries that have ANY meaningful data (title, company, location, dates, bullets, or descriptionHtml)
-        .filter((e) => 
-          (e.title && e.title.trim()) || 
-          (e.company && e.company.trim()) || 
-          (e.location && e.location.trim()) || 
-          e.startDate || 
-          e.endDate || 
-          (e.bullets && e.bullets.length > 0) ||
-          e.descriptionHtml
-        );
+        });
+      console.log(`📝 Preserving ${payload.experience.length} experience entries (including empty ones)`);
     } else {
       payload.experience = [];
     }
 
-    // Add education - include ALL entries with any data to preserve user's work
+    // Add education - preserve ALL entries, even if empty (user may fill them later)
+    // Only filter out null/undefined entries, not empty strings
     if (localResumeData.education && Array.isArray(localResumeData.education)) {
       payload.education = localResumeData.education
+        .filter((e) => e != null && typeof e === "object") // Only filter out null/undefined/non-objects
         .map(cleanDates)
         .map((e) => {
           const edu = {
             degree: e.degree || "",
             school: e.school || "",
             location: e.location || "",
-            details: e.details || [],
+            details: Array.isArray(e.details) ? e.details : [],
           };
           if (e.startDate) edu.startDate = e.startDate;
           if (e.endDate) edu.endDate = e.endDate;
           if (e.gpa) edu.gpa = e.gpa;
           return edu;
-        })
-        // Include entries that have ANY meaningful data (degree, school, location, dates, or details)
-        .filter((e) => 
-          (e.degree && e.degree.trim()) || 
-          (e.school && e.school.trim()) || 
-          (e.location && e.location.trim()) || 
-          e.startDate || 
-          e.endDate || 
-          (e.details && e.details.length > 0) ||
-          e.gpa
-        );
+        });
+      console.log(`📝 Preserving ${payload.education.length} education entries (including empty ones)`);
     } else {
       payload.education = [];
     }
@@ -338,16 +372,49 @@ export const migrateResumeToBackend = async (api) => {
       payload.awards = [];
     }
 
+    // Debug: Log the payload being sent with more details
+    console.log("📤 Sending resume payload to backend:", {
+      title: payload.title,
+      templateSlug: payload.templateSlug,
+      contact: {
+        fullName: payload.contact.fullName,
+        email: payload.contact.email,
+        phone: payload.contact.phone,
+        location: payload.contact.location,
+        hasSummary: !!(payload.contact.summary || payload.contact.professionalSummary),
+        summaryLength: (payload.contact.summary || "").length,
+      },
+      experienceCount: payload.experience.length,
+      experienceDetails: payload.experience.map(e => ({
+        title: e.title,
+        company: e.company,
+        hasBullets: e.bullets?.length > 0,
+      })),
+      educationCount: payload.education.length,
+      educationDetails: payload.education.map(e => ({
+        degree: e.degree,
+        school: e.school,
+        hasDetails: e.details?.length > 0,
+      })),
+      skillsCount: payload.skills.length,
+      skillsSample: payload.skills.slice(0, 3).map(s => s.name || s),
+      projectsCount: payload.projects.length,
+      hobbiesCount: payload.hobbies.length,
+      awardsCount: payload.awards.length,
+    });
+
     // Create resume in backend
     const response = await api.post("/api/v1/resumes", payload);
     const resumeId = response.data?.data?.resumeId;
 
     if (resumeId) {
+      console.log("✅ Resume migrated successfully, resumeId:", resumeId);
       // Clear localStorage after successful migration
       clearResumeLocal();
       return { success: true, resumeId };
     }
 
+    console.error("❌ Failed to create resume - no resumeId in response");
     return { success: false, error: "Failed to create resume" };
   } catch (error) {
     console.error("Failed to migrate resume to backend:", error);

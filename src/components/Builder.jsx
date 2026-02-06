@@ -4240,12 +4240,12 @@ Your progress will be saved. Would you like to upgrade now?`
 
         {/* Navigation buttons */}
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-          <button
+          {/* <button
             type="button"
             style={S.btnGhost}
             onClick={() => setStep((s) => Math.max(1, s - 1))}>
             Back
-          </button>
+          </button> */}
           <button
             type="button"
             style={S.btnSolid}
@@ -4414,6 +4414,8 @@ Your progress will be saved. Would you like to upgrade now?`
 
   // ---------- completion handler (after JSX for clarity) ----------
   async function handleCompletion() {
+    console.log("🔍 handleCompletion called", { hasToken: !!token, templateSlug: resume.templateSlug });
+    
     if (!resume.templateSlug) {
       showAlert("Please select a template first", "warning");
       return;
@@ -4486,6 +4488,52 @@ Your progress will be saved. Would you like to upgrade now?`
       // If still no preview, use local preview
       if (!finalPreviewHtml) {
         finalPreviewHtml = previewHtml || "";
+      }
+
+      // For non-logged-in users, save resume data to localStorage before showing modal
+      // This ensures data is preserved if user signs up/signs in
+      console.log("🔍 Checking token status:", { token: !!token, tokenValue: token });
+      if (!token) {
+        console.log("✅ Non-logged-in user detected, saving resume to localStorage...");
+        // Use the current resume state (not resumeData which might be from server)
+        // This ensures we capture all the latest user input
+        const dataToSave = {
+          ...resume, // Use current resume state which has all the latest data
+          templateSlug: resume.templateSlug || selectedTemplate?.slug,
+        };
+        console.log("📦 Data to save:", {
+          title: dataToSave.title,
+          templateSlug: dataToSave.templateSlug,
+          hasContact: !!dataToSave.contact,
+          experienceCount: dataToSave.experience?.length || 0,
+          educationCount: dataToSave.education?.length || 0,
+        });
+        saveResumeToLocal(dataToSave);
+        console.log("💾 Saved resume to localStorage for non-logged-in user:", {
+          title: dataToSave.title,
+          templateSlug: dataToSave.templateSlug,
+          hasContact: !!dataToSave.contact,
+          contactFields: dataToSave.contact ? Object.keys(dataToSave.contact) : [],
+          contactSample: dataToSave.contact ? {
+            fullName: dataToSave.contact.fullName,
+            email: dataToSave.contact.email,
+            hasSummary: !!(dataToSave.contact.summary || dataToSave.contact.professionalSummary),
+          } : null,
+          experienceCount: dataToSave.experience?.length || 0,
+          experienceSample: dataToSave.experience?.[0] ? {
+            title: dataToSave.experience[0].title,
+            company: dataToSave.experience[0].company,
+          } : null,
+          educationCount: dataToSave.education?.length || 0,
+          educationSample: dataToSave.education?.[0] ? {
+            degree: dataToSave.education[0].degree,
+            school: dataToSave.education[0].school,
+          } : null,
+          skillsCount: dataToSave.skills?.length || 0,
+          projectsCount: dataToSave.projects?.length || 0,
+          hobbiesCount: dataToSave.hobbies?.length || 0,
+          awardsCount: dataToSave.awards?.length || 0,
+        });
       }
 
       setCompletionData({

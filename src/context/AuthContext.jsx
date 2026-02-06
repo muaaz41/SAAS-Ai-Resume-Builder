@@ -147,6 +147,8 @@ export function AuthProvider({ children }) {
     });
     applyToken(null);
     setUser(null);
+    // Redirect to landing page after logout
+    window.location.href = "/";
   }, [applyToken]);
 
   const loginWithGoogle = useCallback(

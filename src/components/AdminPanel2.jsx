@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import Navbar from "./Navbar.jsx";
 import Footer from "./Footer.jsx";
-import { FileText, Users, ChartLine, ChartBar, Pulse, ShieldCheck, Sparkle, Trash, Stack } from "@phosphor-icons/react";
+import { FileText, Users, ChartLine, ChartBar, Pulse, ShieldCheck, Sparkle, Trash, Stack, Upload } from "@phosphor-icons/react";
 import { api } from "../lib/api.js";
 import { showToast } from "../lib/toast.js";
 import { showConfirm } from "../lib/alert.js";
 import { Activity } from "lucide-react";
+import "../css/AdminPanel.css";
+// import TemplateUpload from "./TemplateUpload.jsx";
 
 const THEME = {
   bg: "#f8fafc",
@@ -23,49 +25,11 @@ const THEME = {
 
 // StatCard component defined outside to avoid re-creation on each render
 const StatCard = ({ icon: IconComponent, label, value, unit = "", color = THEME.primary, trend = null }) => (
-    <div style={{
-      background: THEME.surface,
-      borderRadius: "12px",
-      padding: "24px",
-      border: `1px solid ${THEME.border}`,
-      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
-      transition: "all 0.3s ease",
-      cursor: "pointer",
-      position: "relative",
-      overflow: "hidden",
-    }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = "0 8px 24px rgba(0, 0, 0, 0.1)";
-        e.currentTarget.style.transform = "translateY(-4px)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.05)";
-        e.currentTarget.style.transform = "translateY(0)";
-      }}
-    >
-      {/* Gradient background */}
-      <div style={{
-        position: "absolute",
-        top: 0,
-        right: 0,
-        width: "120px",
-        height: "120px",
-        background: `linear-gradient(135deg, ${color}15, ${color}05)`,
-        borderRadius: "50%",
-        transform: "translate(40px, -40px)",
-      }} />
-
-      <div style={{ position: "relative", zIndex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-          <div style={{
-            width: "48px",
-            height: "48px",
-            background: `${color}15`,
-            borderRadius: "12px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}>
+    <div className="admin-stat-card">
+      <div className="stat-glow" style={{ background: `linear-gradient(135deg, ${color}15, ${color}05)` }} />
+      <div className="admin-stat-inner">
+        <div className="admin-stat-top">
+          <div className="admin-stat-icon-wrap" style={{ background: `${color}15` }}>
             <IconComponent size={24} color={color} strokeWidth={2} />
           </div>
           {trend && (
@@ -81,28 +45,10 @@ const StatCard = ({ icon: IconComponent, label, value, unit = "", color = THEME.
             </div>
           )}
         </div>
-
-        <p style={{
-          fontSize: "13px",
-          color: THEME.textMuted,
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
-          fontWeight: "600",
-          margin: "0 0 8px 0",
-        }}>
-          {label}
-        </p>
-
-        <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-          <h3 style={{
-            fontSize: "36px",
-            fontWeight: "800",
-            color: THEME.text,
-            margin: 0,
-          }}>
-            {value}
-          </h3>
-          {unit && <span style={{ fontSize: "16px", color: THEME.textMuted }}>{unit}</span>}
+        <p className="admin-stat-label">{label}</p>
+        <div className="admin-stat-value-row">
+          <h3 className="admin-stat-value">{value}</h3>
+          {unit && <span className="admin-stat-unit">{unit}</span>}
         </div>
       </div>
     </div>
@@ -529,7 +475,11 @@ export default function AdminPanel() {
   const [users, setUsers] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [deletingUserId, setDeletingUserId] = useState(null);
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState(null);
   const [activeTab, setActiveTab] = useState("overview"); // overview, templates, users, activity
+  const [showTemplateUpload, setShowTemplateUpload] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [deletingTemplateSlug, setDeletingTemplateSlug] = useState(null);
 
   // Fetch dashboard data
   useEffect(() => {
@@ -598,6 +548,22 @@ export default function AdminPanel() {
     }
   }, [user]);
 
+  // Fetch templates
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const res = await api.get("/api/v1/templates");
+        const templatesData = res.data?.data?.items || [];
+        setTemplates(templatesData);
+      } catch (err) {
+        console.error("Failed to fetch templates:", err);
+      }
+    };
+    if (user?.role === "admin" && activeTab === "templates") {
+      fetchTemplates();
+    }
+  }, [user, activeTab]);
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -659,6 +625,39 @@ export default function AdminPanel() {
     await handleDeleteUser(userId, userName, true, deleteResumes);
   };
 
+  const handleUpdateUserRole = async (userId, role, userName) => {
+    const isPromote = role === "admin";
+    const confirmed = await showConfirm(
+      isPromote
+        ? `Make "${userName}" an admin?\n\nThey will have full access to the Admin Dashboard.`
+        : `Revoke admin access for "${userName}"?\n\nThey will no longer have access to the Admin Dashboard.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setUpdatingRoleUserId(userId);
+      await api.patch(`/api/v1/admin/users/${userId}/role`, { role });
+      showToast(
+        isPromote ? `"${userName}" is now an admin` : `Admin access revoked for "${userName}"`,
+        { type: "success" }
+      );
+      setUsers((prev) =>
+        prev.map((u) => {
+          const id = u._id || u.id;
+          if (id && id.toString() === userId.toString()) {
+            return { ...u, role };
+          }
+          return u;
+        })
+      );
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || "Failed to update role";
+      showToast(errorMsg, { type: "error" });
+    } finally {
+      setUpdatingRoleUserId(null);
+    }
+  };
+
   if (loading || !user) {
     return <div style={{ padding: 24 }}>Loading...</div>;
   }
@@ -687,41 +686,79 @@ export default function AdminPanel() {
 
   const maxUses = templateData.length > 0 ? Math.max(...templateData.map(t => t.uses || 0)) : 1;
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: THEME.bg }}>
-      <Navbar />
+  const handleTemplateUploadSuccess = () => {
+    setShowTemplateUpload(false);
+    // Refresh template stats and list
+    const fetchData = async () => {
+      try {
+        const [statsRes, templatesRes] = await Promise.all([
+          api.get("/api/v1/admin/dashboard-stats"),
+          api.get("/api/v1/templates"),
+        ]);
+        const data = statsRes.data?.data || {};
+        setTemplateUsage(data.templateUsage || []);
+        setTemplates(templatesRes.data?.data?.items || []);
+      } catch (err) {
+        console.error("Failed to refresh template data:", err);
+      }
+    };
+    fetchData();
+  };
 
-      <main style={{ flex: 1, padding: "40px 20px" }}>
-        <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
+  const handleDeleteTemplate = async (slug, name) => {
+    const confirmed = await showConfirm(
+      `Are you sure you want to delete template "${name}"?\n\nThis will permanently delete:\n- Template files (template.hbs, style.css, mapping.json)\n- Template record from database\n\nThis action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingTemplateSlug(slug);
+      await api.delete(`/api/v1/admin/templates/${slug}`);
+      showToast(`Template "${name}" deleted successfully`, { type: "success" });
+      
+      // Refresh templates list and stats
+      const [templatesRes, statsRes] = await Promise.all([
+        api.get("/api/v1/templates"),
+        api.get("/api/v1/admin/dashboard-stats"),
+      ]);
+      setTemplates(templatesRes.data?.data?.items || []);
+      const data = statsRes.data?.data || {};
+      setTemplateUsage(data.templateUsage || []);
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || "Failed to delete template";
+      showToast(errorMsg, { type: "error" });
+    } finally {
+      setDeletingTemplateSlug(null);
+    }
+  };
+
+  return (
+    <div className="admin-panel-wrap">
+      <Navbar />
+      {showTemplateUpload && (
+        <TemplateUpload
+          onClose={() => setShowTemplateUpload(false)}
+          onSuccess={handleTemplateUploadSuccess}
+        />
+      )}
+
+      <main className="admin-main">
+        <div className="admin-container">
           {/* Header */}
-          <div style={{ marginBottom: "48px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+          <div className="admin-header">
+            <div className="admin-header-row">
               <ChartBar size={32} color={THEME.primary} strokeWidth={2} />
-              <h1 style={{
-                fontSize: "32px",
-                fontWeight: "800",
-                color: THEME.text,
-                margin: 0,
-              }}>
+              <h1 className="admin-title">
                 Admin Dashboard
               </h1>
             </div>
-            <p style={{
-              fontSize: "16px",
-              color: THEME.textMuted,
-              margin: "8px 0 0 0",
-            }}>
+            <p className="admin-subtitle">
               Welcome back! Here's what's happening on your platform today.
             </p>
           </div>
 
           {/* Stats Grid */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "20px",
-            marginBottom: "32px",
-          }}>
+          <div className="admin-stats-grid">
             <StatCard
               icon={Users}
               label="Total Users"
@@ -763,26 +800,9 @@ export default function AdminPanel() {
           </div>
 
           {/* Central Canvas - Main Focus with Tabs */}
-          <div style={{
-            background: THEME.surface,
-            borderRadius: "16px",
-            border: `1px solid ${THEME.border}`,
-            padding: "0",
-            marginBottom: "40px",
-            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
-            display: "flex",
-            minHeight: "600px",
-            overflow: "hidden",
-          }}>
+          <div className="admin-content-card">
             {/* Left Sidebar Tabs */}
-            <div style={{
-              width: "200px",
-              background: THEME.bg,
-              borderRight: `1px solid ${THEME.border}`,
-              display: "flex",
-              flexDirection: "column",
-              padding: "20px 0",
-            }}>
+            <div className="admin-tabs-sidebar">
               {[
                 { id: "overview", label: "Overview", icon: ChartBar },
                 { id: "templates", label: "Templates", icon: Stack },
@@ -794,35 +814,9 @@ export default function AdminPanel() {
                 return (
                   <button
                     key={tab.id}
+                    type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    style={{
-                      background: isActive ? THEME.surface : "transparent",
-                      border: "none",
-                      borderLeft: isActive ? `3px solid ${THEME.primary}` : "3px solid transparent",
-                      padding: "16px 20px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      transition: "all 0.2s ease",
-                      color: isActive ? THEME.primary : THEME.textMuted,
-                      fontWeight: isActive ? "600" : "500",
-                      fontSize: "14px",
-                      width: "100%",
-                      textAlign: "left",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.background = THEME.bg;
-                        e.currentTarget.style.color = THEME.text;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.background = "transparent";
-                        e.currentTarget.style.color = THEME.textMuted;
-                      }
-                    }}
+                    className={`admin-tab-btn ${isActive ? "active" : ""}`}
                   >
                     <IconComponent size={20} weight={isActive ? "fill" : "regular"} />
                     <span>{tab.label}</span>
@@ -832,25 +826,12 @@ export default function AdminPanel() {
             </div>
 
             {/* Right Content Area */}
-            <div style={{
-              flex: 1,
-              padding: "40px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-            }}>
+            <div className="admin-content-area">
               {dataLoading ? (
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: THEME.textMuted,
-                  minHeight: "500px",
-                }}>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "18px", marginBottom: "12px" }}>Loading analytics...</div>
-                    <div style={{ fontSize: "14px", color: THEME.textMuted }}>Fetching dashboard data</div>
+                <div className="admin-loading">
+                  <div className="admin-loading-inner">
+                    <div className="admin-loading-title">Loading analytics...</div>
+                    <div className="admin-loading-sub">Fetching dashboard data</div>
                   </div>
                 </div>
               ) : (
@@ -859,110 +840,131 @@ export default function AdminPanel() {
                     <OverviewCanvas stats={stats} templateData={templateData} />
                   )}
                   {activeTab === "templates" && (
-                    <TemplateStatsCanvas templateData={templateData} />
+                    <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "24px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <h2 className="admin-section-title admin-section-title-lg">
+                          Template Management
+                        </h2>
+                        {/* <button
+                          onClick={() => setShowTemplateUpload(true)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            padding: "12px 20px",
+                            background: THEME.primary,
+                            color: "white",
+                            border: "none",
+                            borderRadius: "8px",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <Upload size={20} />
+                          Upload Template
+                        </button> */}
+                      </div>
+                      
+                      {/* Template List */}
+                      <div className="admin-table-card">
+                        <div className="admin-table-card-header">
+                          <h3 className="admin-table-card-title">
+                            All Templates ({templates.length})
+                          </h3>
+                        </div>
+                        <div className="admin-table-scroll">
+                          {templates.length === 0 ? (
+                            <div className="admin-empty">
+                              No templates found
+                            </div>
+                          ) : (
+                            <table className="admin-table">
+                              <thead>
+                                <tr>
+                                  <th>Name</th>
+                                  <th>Category</th>
+                                  <th>Slug</th>
+                                  <th>Status</th>
+                                  <th style={{ textAlign: "right" }}>Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {templates.map((template) => (
+                                  <tr key={template.slug || template._id}>
+                                    <td>{template.name}</td>
+                                    <td>
+                                      <span className={`admin-badge ${template.category === "premium" ? "admin-badge-premium" : template.category === "industry" ? "admin-badge-industry" : "admin-badge-free"}`}>
+                                        {template.category || "free"}
+                                      </span>
+                                    </td>
+                                    <td style={{ fontFamily: "monospace", color: THEME.textMuted }}>
+                                      {template.slug}
+                                    </td>
+                                    <td>
+                                      <span className={template.isActive ? "admin-badge admin-badge-active" : "admin-badge admin-badge-inactive"}>
+                                        {template.isActive ? "Active" : "Inactive"}
+                                      </span>
+                                    </td>
+                                    <td style={{ textAlign: "right" }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteTemplate(template.slug, template.name)}
+                                        disabled={deletingTemplateSlug === template.slug}
+                                        className="admin-btn admin-btn-danger"
+                                      >
+                                        <Trash size={14} />
+                                        {deletingTemplateSlug === template.slug ? "Deleting..." : "Delete"}
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </div>
+
+                      <TemplateStatsCanvas templateData={templateData} />
+                    </div>
                   )}
                   {activeTab === "users" && (
                     <UserStatsCanvas stats={stats} />
                   )}
                   {activeTab === "activity" && (
-                    <div style={{
-                      width: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "24px",
-                      maxWidth: "800px",
-                    }}>
-                      <h2 style={{
-                        fontSize: "22px",
-                        fontWeight: "700",
-                        color: THEME.text,
-                        margin: "0 0 24px 0",
-                        textAlign: "center",
-                      }}>
+                    <div className="admin-activity-list">
+                      <h2 className="admin-activity-title">
                         Recent Activity
                       </h2>
-                      <div style={{
-                        background: THEME.bg,
-                        borderRadius: "12px",
-                        padding: "20px",
-                        border: `1px solid ${THEME.border}`,
-                      }}>
-                        <div style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: "16px",
-                        }}>
+                      <div className="admin-metric-block">
+                        <div className="admin-metric-row">
                           <div>
-                            <div style={{ fontSize: "16px", fontWeight: "600", color: THEME.text }}>
-                              New Users Today
-                            </div>
-                            <div style={{ fontSize: "13px", color: THEME.textMuted }}>
-                              Users registered in the last 24 hours
-                            </div>
+                            <div className="admin-metric-label">New Users Today</div>
+                            <div className="admin-metric-desc">Users registered in the last 24 hours</div>
                           </div>
-                          <div style={{
-                            fontSize: "32px",
-                            fontWeight: "800",
-                            color: THEME.primary,
-                          }}>
+                          <div className="admin-metric-value">
                             {stats.newUsersToday || 0}
                           </div>
                         </div>
                       </div>
-                      <div style={{
-                        background: THEME.bg,
-                        borderRadius: "12px",
-                        padding: "20px",
-                        border: `1px solid ${THEME.border}`,
-                      }}>
-                        <div style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: "16px",
-                        }}>
+                      <div className="admin-metric-block">
+                        <div className="admin-metric-row">
                           <div>
-                            <div style={{ fontSize: "16px", fontWeight: "600", color: THEME.text }}>
-                              New Resumes Today
-                            </div>
-                            <div style={{ fontSize: "13px", color: THEME.textMuted }}>
-                              Resumes created in the last 24 hours
-                            </div>
+                            <div className="admin-metric-label">New Resumes Today</div>
+                            <div className="admin-metric-desc">Resumes created in the last 24 hours</div>
                           </div>
-                          <div style={{
-                            fontSize: "32px",
-                            fontWeight: "800",
-                            color: THEME.success,
-                          }}>
+                          <div className="admin-metric-value admin-metric-value-success">
                             {stats.newResumesToday || 0}
                           </div>
                         </div>
                       </div>
-                      <div style={{
-                        background: THEME.bg,
-                        borderRadius: "12px",
-                        padding: "20px",
-                        border: `1px solid ${THEME.border}`,
-                      }}>
-                        <div style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}>
+                      <div className="admin-metric-block">
+                        <div className="admin-metric-row">
                           <div>
-                            <div style={{ fontSize: "16px", fontWeight: "600", color: THEME.text }}>
-                              Active Users (30 days)
-                            </div>
-                            <div style={{ fontSize: "13px", color: THEME.textMuted }}>
-                              Users active in the last 30 days
-                            </div>
+                            <div className="admin-metric-label">Active Users (30 days)</div>
+                            <div className="admin-metric-desc">Users active in the last 30 days</div>
                           </div>
-                          <div style={{
-                            fontSize: "32px",
-                            fontWeight: "800",
-                            color: "#06b6d4",
-                          }}>
+                          <div className="admin-metric-value admin-metric-value-cyan">
                             {stats.activeUsers || 0}
                           </div>
                         </div>
@@ -975,63 +977,27 @@ export default function AdminPanel() {
           </div>
 
           {/* Secondary Content: Template Usage Cards + Side Chart */}
-          <style>{`
-            .admin-main-grid {
-              display: grid;
-              grid-template-columns: 1fr 2fr;
-              gap: 32px;
-              margin-bottom: 40px;
-            }
-            @media (max-width: 1024px) {
-              .admin-main-grid {
-                grid-template-columns: 1fr !important;
-              }
-            }
-          `}</style>
           <div className="admin-main-grid">
             {/* Left: Template Usage Cards */}
-            <div style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "20px",
-            }}>
-              <div style={{
-                background: THEME.surface,
-                borderRadius: "16px",
-                border: `1px solid ${THEME.border}`,
-                padding: "24px",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
-              }}>
-                <h2 style={{
-                  fontSize: "18px",
-                  fontWeight: "700",
-                  color: THEME.text,
-                  margin: "0 0 20px 0",
-                }}>
+            <div className="admin-side-cards">
+              <div className="admin-card">
+                <h2 className="admin-card-title">
                   Top Template Usage
                 </h2>
 
                 {dataLoading ? (
-                  <div style={{ padding: "20px", textAlign: "center", color: THEME.textMuted }}>
+                  <div className="admin-empty" style={{ padding: "20px" }}>
                     Loading...
                   </div>
                 ) : templateData.length === 0 ? (
-                  <div style={{ padding: "20px", textAlign: "center", color: THEME.textMuted }}>
+                  <div className="admin-empty" style={{ padding: "20px" }}>
                     No template usage data
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                     {templateData.slice(0, 6).map((template, idx) => (
-                      <div key={idx} style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}>
+                      <div key={idx} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <span style={{
                             fontSize: "13px",
                             fontWeight: "600",
@@ -1052,20 +1018,14 @@ export default function AdminPanel() {
                             {template.uses}
                           </span>
                         </div>
-                        <div style={{
-                          height: "8px",
-                          background: "#f1f5f9",
-                          borderRadius: "4px",
-                          overflow: "hidden",
-                          position: "relative",
-                        }}>
-                          <div style={{
-                            height: "100%",
-                            width: `${((template.uses || 0) / maxUses) * 100}%`,
-                            background: `linear-gradient(90deg, ${template.color || THEME.primary}, ${template.color || THEME.primary}dd)`,
-                            borderRadius: "4px",
-                            transition: "width 0.5s ease",
-                          }} />
+                        <div className="admin-progress-wrap">
+                          <div
+                            className="admin-progress-bar"
+                            style={{
+                              width: `${((template.uses || 0) / maxUses) * 100}%`,
+                              background: `linear-gradient(90deg, ${template.color || THEME.primary}, ${(template.color || THEME.primary) + "dd"})`,
+                            }}
+                          />
                         </div>
                       </div>
                     ))}
@@ -1074,19 +1034,8 @@ export default function AdminPanel() {
               </div>
 
               {/* Recent Activity */}
-              <div style={{
-                background: THEME.surface,
-                borderRadius: "16px",
-                border: `1px solid ${THEME.border}`,
-                padding: "24px",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
-              }}>
-                <h3 style={{
-                  fontSize: "18px",
-                  fontWeight: "700",
-                  color: THEME.text,
-                  margin: "0 0 16px 0",
-                }}>
+              <div className="admin-card">
+                <h3 className="admin-card-title">
                   Recent Activity
                 </h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -1113,53 +1062,20 @@ export default function AdminPanel() {
             </div>
 
             {/* Center: Canvas Chart */}
-            <div style={{
-              background: THEME.surface,
-              borderRadius: "16px",
-              border: `1px solid ${THEME.border}`,
-              padding: "32px",
-              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
-              display: "flex",
-              flexDirection: "column",
-            }}>
-              <h2 style={{
-                fontSize: "20px",
-                fontWeight: "700",
-                color: THEME.text,
-                margin: "0 0 24px 0",
-              }}>
+            <div className="admin-card" style={{ display: "flex", flexDirection: "column" }}>
+              <h2 className="admin-section-title" style={{ marginBottom: "24px" }}>
                 Template Usage Chart
               </h2>
               {dataLoading ? (
-                <div style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: THEME.textMuted,
-                  minHeight: "300px",
-                }}>
+                <div className="admin-empty" style={{ flex: 1, minHeight: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   Loading chart data...
                 </div>
               ) : templateData.length === 0 ? (
-                <div style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: THEME.textMuted,
-                  minHeight: "300px",
-                }}>
+                <div className="admin-empty" style={{ flex: 1, minHeight: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   No template usage data available
                 </div>
               ) : (
-                <div style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minHeight: "300px",
-                }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "300px" }}>
                   <TemplateUsageChart templateData={templateData} />
                 </div>
               )}
@@ -1167,198 +1083,118 @@ export default function AdminPanel() {
           </div>
 
           {/* Additional Stats Grid */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: "24px",
-            marginBottom: "40px",
-          }}>
+          <div className="admin-extra-grid">
             {/* User Status */}
-            <div style={{
-              background: THEME.surface,
-              borderRadius: "16px",
-              border: `1px solid ${THEME.border}`,
-              padding: "24px",
-              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
-            }}>
-              <h3 style={{
-                fontSize: "16px",
-                fontWeight: "700",
-                color: THEME.text,
-                margin: "0 0 20px 0",
-              }}>
+            <div className="admin-card">
+              <h3 className="admin-card-title" style={{ fontSize: "16px" }}>
                 User Status
               </h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <div>
-                  <div style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "8px",
-                  }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                     <span style={{ fontSize: "14px", color: THEME.textMuted }}>Email Verified</span>
                     <span style={{ fontSize: "14px", fontWeight: "600", color: THEME.success }}>
                       {stats.totalUsers > 0 ? Math.round((stats.verifiedUsers / stats.totalUsers) * 100) : 0}%
                     </span>
                   </div>
-                  <div style={{
-                    height: "8px",
-                    background: "#f1f5f9",
-                    borderRadius: "4px",
-                    overflow: "hidden",
-                  }}>
-                    <div style={{
-                      height: "100%",
-                      width: `${stats.totalUsers > 0 ? (stats.verifiedUsers / stats.totalUsers) * 100 : 0}%`,
-                      background: THEME.success,
-                    }} />
+                  <div className="admin-progress-wrap">
+                    <div
+                      className="admin-progress-bar"
+                      style={{
+                        width: `${stats.totalUsers > 0 ? (stats.verifiedUsers / stats.totalUsers) * 100 : 0}%`,
+                        background: THEME.success,
+                      }}
+                    />
                   </div>
                 </div>
-
                 <div>
-                  <div style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "8px",
-                  }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                     <span style={{ fontSize: "14px", color: THEME.textMuted }}>Premium Users</span>
                     <span style={{ fontSize: "14px", fontWeight: "600", color: THEME.warning }}>
                       {stats.totalUsers > 0 ? Math.round(((stats.premiumUsers || 0) / stats.totalUsers) * 100) : 0}%
                     </span>
                   </div>
-                  <div style={{
-                    height: "8px",
-                    background: "#f1f5f9",
-                    borderRadius: "4px",
-                    overflow: "hidden",
-                  }}>
-                    <div style={{
-                      height: "100%",
-                      width: `${stats.totalUsers > 0 ? ((stats.premiumUsers || 0) / stats.totalUsers) * 100 : 0}%`,
-                      background: THEME.warning,
-                    }} />
+                  <div className="admin-progress-wrap">
+                    <div
+                      className="admin-progress-bar"
+                      style={{
+                        width: `${stats.totalUsers > 0 ? ((stats.premiumUsers || 0) / stats.totalUsers) * 100 : 0}%`,
+                        background: THEME.warning,
+                      }}
+                    />
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Platform Health */}
-            <div style={{
-              background: `linear-gradient(135deg, ${THEME.primary}, ${THEME.primary}ee)`,
-              borderRadius: "16px",
-              padding: "24px",
-              color: "#fff",
-              boxShadow: "0 4px 16px rgba(37, 99, 235, 0.2)",
-            }}>
-              <h3 style={{
-                fontSize: "16px",
-                fontWeight: "700",
-                margin: "0 0 20px 0",
-              }}>
-                Platform Health
-              </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>System Status</span>
-                  <span style={{ fontWeight: "700" }}>● Operational</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>Total Templates</span>
-                  <span style={{ fontWeight: "700" }}>{templateUsage.length}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>Active Users</span>
-                  <span style={{ fontWeight: "700" }}>{stats.activeUsers || 0}</span>
-                </div>
+            <div className="admin-health-card">
+              <h3>Platform Health</h3>
+              <div className="admin-health-row">
+                <span>System Status</span>
+                <span>● Operational</span>
+              </div>
+              <div className="admin-health-row">
+                <span>Total Templates</span>
+                <span>{templateUsage.length}</span>
+              </div>
+              <div className="admin-health-row">
+                <span>Active Users</span>
+                <span>{stats.activeUsers || 0}</span>
               </div>
             </div>
           </div>
 
           {/* Users Management Section */}
-          <div style={{
-            background: THEME.surface,
-            borderRadius: "16px",
-            border: `1px solid ${THEME.border}`,
-            padding: "32px",
-            marginBottom: "40px",
-            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
-          }}>
-            <h2 style={{
-              fontSize: "20px",
-              fontWeight: "700",
-              color: THEME.text,
-              margin: "0 0 24px 0",
-            }}>
-              Users Management
-            </h2>
+          <div className="admin-users-section">
+            <h2>Users Management</h2>
 
             {dataLoading ? (
-              <div style={{ padding: "40px", textAlign: "center", color: THEME.textMuted }}>
+              <div className="admin-empty">
                 Loading users...
               </div>
             ) : users.length === 0 ? (
-              <div style={{ padding: "40px", textAlign: "center", color: THEME.textMuted }}>
+              <div className="admin-empty">
                 No users found
               </div>
             ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
                   <thead>
-                    <tr style={{ borderBottom: `2px solid ${THEME.border}` }}>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: THEME.textMuted, textTransform: "uppercase" }}>Name</th>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: THEME.textMuted, textTransform: "uppercase" }}>Email</th>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: THEME.textMuted, textTransform: "uppercase" }}>Role</th>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: THEME.textMuted, textTransform: "uppercase" }}>Status</th>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: THEME.textMuted, textTransform: "uppercase" }}>Plan</th>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: THEME.textMuted, textTransform: "uppercase" }}>Joined</th>
-                      <th style={{ padding: "12px", textAlign: "center", fontSize: "13px", fontWeight: "600", color: THEME.textMuted, textTransform: "uppercase" }}>Actions</th>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Plan</th>
+                      <th>Joined</th>
+                      <th className="admin-actions-cell">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {users.map((u) => (
-                      <tr key={u._id || u.id} style={{ borderBottom: `1px solid ${THEME.border}` }}>
-                        <td style={{ padding: "12px", fontSize: "14px", color: THEME.text }}>{u.name || "N/A"}</td>
-                        <td style={{ padding: "12px", fontSize: "14px", color: THEME.text }}>{u.email}</td>
-                        <td style={{ padding: "12px" }}>
-                          <span style={{
-                            padding: "4px 8px",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: "600",
-                            background: u.role === "admin" ? `${THEME.primary}15` : `${THEME.success}15`,
-                            color: u.role === "admin" ? THEME.primary : THEME.success,
-                          }}>
+                      <tr key={u._id || u.id}>
+                        <td>{u.name || "N/A"}</td>
+                        <td>{u.email}</td>
+                        <td>
+                          <span className={u.role === "admin" ? "admin-badge admin-badge-admin" : "admin-badge admin-badge-user"}>
                             {u.role || "user"}
                           </span>
                         </td>
-                        <td style={{ padding: "12px" }}>
-                          <span style={{
-                            padding: "4px 8px",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: "600",
-                            background: u.isVerified ? `${THEME.success}15` : `${THEME.warning}15`,
-                            color: u.isVerified ? THEME.success : THEME.warning,
-                          }}>
+                        <td>
+                          <span className={u.isVerified ? "admin-badge admin-badge-verified" : "admin-badge admin-badge-unverified"}>
                             {u.isVerified ? "Verified" : "Unverified"}
                           </span>
                         </td>
-                        <td style={{ padding: "12px" }}>
-                          <span style={{
-                            padding: "4px 8px",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: "600",
-                            background: u.plan === "premium" || u.plan === "professional" ? `${THEME.warning}15` : `${THEME.textMuted}15`,
-                            color: u.plan === "premium" || u.plan === "professional" ? THEME.warning : THEME.textMuted,
-                          }}>
+                        <td>
+                          <span className={u.plan === "premium" || u.plan === "professional" ? "admin-badge admin-badge-premium" : "admin-badge admin-badge-inactive"}>
                             {u.plan || "free"}
                           </span>
                         </td>
-                        <td style={{ padding: "12px", fontSize: "13px", color: THEME.textMuted }}>
+                        <td style={{ color: THEME.textMuted, fontSize: "13px" }}>
                           {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "N/A"}
                         </td>
-                        <td style={{ padding: "12px", textAlign: "center" }}>
+                        <td className="admin-actions-cell">
                           {(() => {
                             const currentUserId = user?._id || user?.id;
                             const userId = u._id || u.id;
@@ -1366,57 +1202,52 @@ export default function AdminPanel() {
                             
                             if (isCurrentUser) {
                               return (
-                                <span style={{ 
-                                  fontSize: "12px", 
-                                  color: THEME.textMuted, 
-                                  fontStyle: "italic" 
-                                }}>
+                                <span className="admin-no-self">
                                   Cannot delete yourself
                                 </span>
                               );
                             }
                             
                             return (
-                              <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center" }}>
+                              <div className="admin-actions-group">
+                                {u.role !== "admin" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateUserRole(userId, "admin", u.name || u.email)}
+                                    disabled={updatingRoleUserId === userId}
+                                    className="admin-btn admin-btn-make-admin"
+                                    title="Grant this user admin access"
+                                  >
+                                    <ShieldCheck size={14} />
+                                    {updatingRoleUserId === userId ? "Updating..." : "Make Admin"}
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateUserRole(userId, "user", u.name || u.email)}
+                                    disabled={updatingRoleUserId === userId}
+                                    className="admin-btn admin-btn-revoke-admin"
+                                    title="Revoke admin access"
+                                  >
+                                    <ShieldCheck size={14} />
+                                    {updatingRoleUserId === userId ? "Updating..." : "Revoke Admin"}
+                                  </button>
+                                )}
                                 <button
+                                  type="button"
                                   onClick={() => handleDeleteUser(userId, u.name || u.email, false)}
                                   disabled={deletingUserId === userId}
-                                  style={{
-                                    padding: "6px 12px",
-                                    background: THEME.danger,
-                                    color: "#fff",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    fontSize: "12px",
-                                    fontWeight: "600",
-                                    cursor: deletingUserId === userId ? "not-allowed" : "pointer",
-                                    opacity: deletingUserId === userId ? 0.6 : 1,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                  }}
+                                  className="admin-btn admin-btn-danger"
                                   title="Soft delete - User data retained for 30 days"
                                 >
                                   <Trash size={14} />
                                   {deletingUserId === userId ? "Deleting..." : "Delete"}
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => handleHardDeleteWithConfirm(userId, u.name || u.email)}
                                   disabled={deletingUserId === userId}
-                                  style={{
-                                    padding: "6px 10px",
-                                    background: "#991b1b",
-                                    color: "#fff",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    fontSize: "11px",
-                                    fontWeight: "600",
-                                    cursor: deletingUserId === userId ? "not-allowed" : "pointer",
-                                    opacity: deletingUserId === userId ? 0.6 : 1,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                  }}
+                                  className="admin-btn admin-btn-hard"
                                   title="Permanent delete - Cannot be undone!"
                                 >
                                   <Trash size={12} weight="fill" />

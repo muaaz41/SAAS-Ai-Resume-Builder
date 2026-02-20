@@ -8,7 +8,7 @@ import ResumeUpload from "./ResumeUpload.jsx";
 import TemplateCard from "./TemplateCard.jsx";
 import { showToast } from "../lib/toast";
 import { Clock } from 'lucide-react';
-import { HandWaving, MagnifyingGlass, MagnifyingGlassIcon, ReadCvLogo, Sparkle, TrayArrowUp, UploadIcon, FileText } from "@phosphor-icons/react";
+import { HandWaving, MagnifyingGlass, MagnifyingGlassIcon, ReadCvLogo, ShieldCheck, Sparkle, TrayArrowUp, UploadIcon, FileText } from "@phosphor-icons/react";
 import { showAlert, showConfirm } from "../lib/alert.js";
 
 const HIDDEN_TEMPLATE_NAMES = new Set([
@@ -712,7 +712,39 @@ export default function Dashboard() {
               Manage your resumes and create professional documents
             </p>
           </div>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          {user?.role === "admin" && (
+            <button
+              type="button"
+              onClick={() => navigate("/admin")}
+              style={{
+                background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
+                color: "#fff",
+                border: "none",
+                borderRadius: 12,
+                padding: "12px 18px",
+                fontWeight: "var(--font-weight-semibold)",
+                cursor: "pointer",
+                fontSize: "var(--font-size-sm)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                boxShadow: "0 4px 12px rgba(124, 58, 237, 0.3)",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 6px 16px rgba(124, 58, 237, 0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(124, 58, 237, 0.3)";
+              }}
+            >
+              <ShieldCheck size={18} weight="bold" />
+              Admin Dashboard
+            </button>
+          )}
           <button
             onClick={() => {
               if (resumes.length >= 5) {

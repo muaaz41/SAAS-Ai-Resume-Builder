@@ -51,7 +51,7 @@ const SignIn = () => {
         }
       }
       
-      navigate("/dashboard");
+      navigate("/profile");
     } catch (err) {
       let msg;
       if (err?.status === 401 || /invalid/i.test(err?.message || "")) {
@@ -210,7 +210,7 @@ const SignIn = () => {
                       }
                     }
                     
-                    navigate("/dashboard");
+                    navigate("/profile");
                   } catch (e) {
                     console.error("Google login error:", e);
                     const errorMsg =
@@ -302,7 +302,7 @@ const SignIn = () => {
                       res.data?.data?.message ||
                       "Account restored successfully";
                     showToast(msg, { type: "success", duration: 3000 });
-                    navigate("/dashboard");
+                    navigate("/profile");
                   } catch (err) {
                     console.error("Restore account error:", err);
                     const msg =

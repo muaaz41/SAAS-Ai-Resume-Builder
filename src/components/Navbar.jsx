@@ -34,15 +34,13 @@ const Navbar = () => {
             <Link to="/dashboard">User Dashboard</Link>
           )}
           <Link to="/pricing">Pricing Plan</Link>
+          <Link to="/profile">Profile</Link>
         </nav>
 
         {/* Desktop CTA */}
         <div className="nav-cta">
           {token ? (
             <>
-              <span title={user?.email}>
-                {user?.email?.length > 20 ? `${user?.email?.substring(0, 20)}...` : user?.email}
-              </span>
               <Link
                 className="btn-solid"
                 to="/builder"

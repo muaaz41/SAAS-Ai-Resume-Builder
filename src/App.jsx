@@ -13,10 +13,12 @@ import ResetPassword from "./components/ResetPassword.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Builder from "./components/Builder.jsx";
 import Dashboard from "./components/Dashboard.jsx";
+import TemplateShowcase from "./components/TemplateShowcase.jsx";
 import AdminPanel from "./components/AdminPanel2.jsx";
 import ATSChecker from "./components/ATSChecker.jsx";
 import Pricing from "./components/Pricing.jsx";
 import ResumeStartFlow from "./components/ResumeStartFlow.jsx";
+import TemplatePickerPage from "./components/TemplatePickerPage.jsx";
 import TypographyDemo from "./components/TypographyDemo.jsx";
 
 function App() {
@@ -24,6 +26,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/resume-start" element={<ResumeStartFlow />} />
+      <Route path="/dashboard" element={<TemplatePickerPage />} />
       <Route path="/signin" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
       <Route path="/auth/verify-email" element={<VerifyEmailPrompt />} />
@@ -31,7 +34,8 @@ function App() {
       <Route path="/auth/verify" element={<VerifyEmailResult />} />
       <Route path="/auth/forgot-password" element={<ForgotPassword />} />
       <Route path="/auth/reset-password" element={<ResetPassword />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/dashboards" element={<Dashboard />} />
+      <Route path="/profile" element={<TemplateShowcase />} />
       <Route path="/admin" element={<AdminPanel />} />
       <Route path="/builder" element={<Builder />} />
       <Route path="/auth/linkedin/callback" element={<LinkedInCallback />} />

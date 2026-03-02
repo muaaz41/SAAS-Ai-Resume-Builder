@@ -505,7 +505,7 @@ function TemplatePreviewModal({ template, onClose, onContinue }) {
           return;
         }
 
-        // Use the public template preview endpoint
+        // Use the public template preview endpoint  
         try {
           const previewResponse = await fetch(
             `/api/v1/templates/${template.slug}/preview`,

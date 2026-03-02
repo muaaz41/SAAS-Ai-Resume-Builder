@@ -400,15 +400,15 @@ const ResumeStartFlow = () => {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                    gap: "20px",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                    gap: 16,
                   }}
                 >
                   {[1, 2, 3, 4, 5, 6].map((i) => (
                     <div
                       key={i}
                       style={{
-                        height: 400,
+                        height: 520,
                         background: "linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)",
                         borderRadius: 20,
                         border: "1px solid #e2e8f0",
@@ -435,8 +435,8 @@ const ResumeStartFlow = () => {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                    gap: "20px",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                    gap: 16,
                   }}
                 >
                   {templates.map((t) => {
@@ -448,6 +448,7 @@ const ResumeStartFlow = () => {
                         template={t}
                         isPremium={isPremium}
                         locked={false}
+                        fullPreview
                         onSelect={() => {
                           setShowTemplateModal(false);
                           handleContinueToBuilder(t);

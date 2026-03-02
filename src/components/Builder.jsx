@@ -141,6 +141,20 @@ const formatTemplateName = (template) => {
     .join(" ");
 };
 
+// Contact + summary field keys that can be restricted per template.
+// Must match backend seed CONTACT_FIELDS (scripts/seed-templates.js).
+const ALL_CONTACT_FIELDS = [
+  "fullName", "email", "phone", "location", "address", "website",
+  "headline", "linkedin", "github", "portfolioLink", "summary", "professionalSummary",
+];
+// Templates that do not display all builder contact fields. Omit a template = all fields supported.
+const TEMPLATE_CONTACT_FIELDS = {
+  "modern-muaaz-mlqww1so": ["fullName", "email", "phone", "location", "professionalSummary"],
+  "modern-gray-mlqwlisv": ["fullName", "email", "phone", "location", "professionalSummary"],
+  "random-blue": ["fullName", "email", "phone", "summary"],
+};
+// Section keys for steps 3–7. Must match backend SECTION_KEYS (seed-templates.js).
+const ALL_SECTION_KEYS = ["experience", "education", "skills", "projects", "hobbies", "awards"];
 
 // ------------------------------
 // Builder Component
@@ -414,6 +428,29 @@ export default function Builder() {
     }
     return null;
   }, [selectedTemplate, resume.templateSlug, templates]);
+
+  // Supported contact fields for the current template (unsupported fields are disabled with a message).
+  // Prefer backend metadata (Template.supportedContactFields) and fall back to a local map for older data.
+  const supportedContactFields = useMemo(() => {
+    const fromBackend = resolvedTemplate?.supportedContactFields;
+    if (Array.isArray(fromBackend) && fromBackend.length) {
+      return new Set(fromBackend);
+    }
+
+    const slug = selectedTemplate?.slug || resume?.templateSlug;
+    if (!slug) return new Set(ALL_CONTACT_FIELDS);
+    const list = TEMPLATE_CONTACT_FIELDS[slug];
+    return list ? new Set(list) : new Set(ALL_CONTACT_FIELDS);
+  }, [resolvedTemplate?.supportedContactFields, selectedTemplate?.slug, resume?.templateSlug]);
+  const isFieldSupportedByTemplate = (fieldKey) => supportedContactFields.has(fieldKey);
+
+  // Supported sections (experience, education, skills, projects, hobbies, awards) for the current template.
+  const supportedSections = useMemo(() => {
+    const fromBackend = resolvedTemplate?.supportedSections;
+    if (Array.isArray(fromBackend) && fromBackend.length) return new Set(fromBackend);
+    return new Set(ALL_SECTION_KEYS);
+  }, [resolvedTemplate?.supportedSections]);
+  const isSectionSupportedByTemplate = (sectionKey) => supportedSections.has(sectionKey);
 
   const templateDisplayName = formatTemplateName(resolvedTemplate);
   const hasTemplateSelected = Boolean(resolvedTemplate?.slug);
@@ -2805,7 +2842,11 @@ Your progress will be saved. Would you like to upgrade now?`
               <label style={S.label}>Full Name *</label>
               <input
                 placeholder="John Doe"
-                style={S.input}
+                style={{
+                  ...S.input,
+                  ...(!isFieldSupportedByTemplate("fullName") ? { opacity: 0.7, cursor: "not-allowed" } : {}),
+                }}
+                disabled={!isFieldSupportedByTemplate("fullName")}
                       value={resume.contact.fullName || ""}
                 onChange={(e) => {
                   setResume((r) => ({
@@ -2815,6 +2856,9 @@ Your progress will be saved. Would you like to upgrade now?`
                   markTyping();
                 }}
               />
+              {!isFieldSupportedByTemplate("fullName") && (
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>This template does not display this field.</div>
+              )}
             </div>
 
                   <div style={{ marginBottom: 16 }}>
@@ -2822,7 +2866,11 @@ Your progress will be saved. Would you like to upgrade now?`
               <input
                 type="email"
                 placeholder="john@example.com"
-                style={S.input}
+                style={{
+                  ...S.input,
+                  ...(!isFieldSupportedByTemplate("email") ? { opacity: 0.7, cursor: "not-allowed" } : {}),
+                }}
+                disabled={!isFieldSupportedByTemplate("email")}
                       value={resume.contact.email || ""}
                 onChange={(e) => {
                   setResume((r) => ({
@@ -2832,13 +2880,20 @@ Your progress will be saved. Would you like to upgrade now?`
                   markTyping();
                 }}
               />
+              {!isFieldSupportedByTemplate("email") && (
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>This template does not display this field.</div>
+              )}
             </div>
 
                   <div style={{ marginBottom: 16 }}>
               <label style={S.label}>Phone</label>
               <input
                 placeholder="+1 234 567 8901"
-                style={S.input}
+                style={{
+                  ...S.input,
+                  ...(!isFieldSupportedByTemplate("phone") ? { opacity: 0.7, cursor: "not-allowed" } : {}),
+                }}
+                disabled={!isFieldSupportedByTemplate("phone")}
                       value={resume.contact.phone || ""}
                 onChange={(e) => {
                   setResume((r) => ({
@@ -2848,13 +2903,20 @@ Your progress will be saved. Would you like to upgrade now?`
                   markTyping();
                 }}
               />
+              {!isFieldSupportedByTemplate("phone") && (
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>This template does not display this field.</div>
+              )}
             </div>
 
                   <div style={{ marginBottom: 16 }}>
               <label style={S.label}>Location *</label>
               <input
                 placeholder="New York, NY"
-                style={S.input}
+                style={{
+                  ...S.input,
+                  ...(!isFieldSupportedByTemplate("location") ? { opacity: 0.7, cursor: "not-allowed" } : {}),
+                }}
+                disabled={!isFieldSupportedByTemplate("location")}
                 value={resume.contact.location || ""}
                 onChange={(e) => {
                   setResume((r) => ({
@@ -2864,6 +2926,9 @@ Your progress will be saved. Would you like to upgrade now?`
                   markTyping();
                 }}
               />
+              {!isFieldSupportedByTemplate("location") && (
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>This template does not display this field.</div>
+              )}
             </div>
                 </div>
 
@@ -2873,7 +2938,11 @@ Your progress will be saved. Would you like to upgrade now?`
                     <label style={S.label}>Job Title / Headline</label>
               <input
                       placeholder="Product Designer (UX/UI)"
-                style={S.input}
+                style={{
+                  ...S.input,
+                  ...(!isFieldSupportedByTemplate("headline") ? { opacity: 0.7, cursor: "not-allowed" } : {}),
+                }}
+                disabled={!isFieldSupportedByTemplate("headline")}
                       value={resume.contact.headline || ""}
                 onChange={(e) => {
                   setResume((r) => ({
@@ -2883,13 +2952,20 @@ Your progress will be saved. Would you like to upgrade now?`
                   markTyping();
                 }}
               />
+              {!isFieldSupportedByTemplate("headline") && (
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>This template does not display this field.</div>
+              )}
             </div>
 
                   <div style={{ marginBottom: 16 }}>
               <label style={S.label}>LinkedIn</label>
               <input
                 placeholder="https://linkedin.com/in/username"
-                style={S.input}
+                style={{
+                  ...S.input,
+                  ...(!isFieldSupportedByTemplate("linkedin") ? { opacity: 0.7, cursor: "not-allowed" } : {}),
+                }}
+                disabled={!isFieldSupportedByTemplate("linkedin")}
                 value={resume.contact.linkedin || ""}
                 onChange={(e) => {
                   setResume((r) => ({
@@ -2899,13 +2975,20 @@ Your progress will be saved. Would you like to upgrade now?`
                   markTyping();
                 }}
               />
+              {!isFieldSupportedByTemplate("linkedin") && (
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>This template does not display this field.</div>
+              )}
             </div>
 
                   <div style={{ marginBottom: 16 }}>
                     <label style={S.label}>GitHub</label>
               <input
                       placeholder="https://github.com/username"
-                style={S.input}
+                style={{
+                  ...S.input,
+                  ...(!isFieldSupportedByTemplate("github") ? { opacity: 0.7, cursor: "not-allowed" } : {}),
+                }}
+                disabled={!isFieldSupportedByTemplate("github")}
                       value={resume.contact.github || ""}
                 onChange={(e) => {
                   setResume((r) => ({
@@ -2915,13 +2998,20 @@ Your progress will be saved. Would you like to upgrade now?`
                   markTyping();
                 }}
               />
+              {!isFieldSupportedByTemplate("github") && (
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>This template does not display this field.</div>
+              )}
             </div>
 
                   <div style={{ marginBottom: 16 }}>
                     <label style={S.label}>Portfolio Link</label>
               <input
                       placeholder="https://yourportfolio.com"
-                style={S.input}
+                style={{
+                  ...S.input,
+                  ...(!isFieldSupportedByTemplate("portfolioLink") ? { opacity: 0.7, cursor: "not-allowed" } : {}),
+                }}
+                disabled={!isFieldSupportedByTemplate("portfolioLink")}
                       value={resume.contact.portfolioLink || ""}
                 onChange={(e) => {
                   setResume((r) => ({
@@ -2931,6 +3021,9 @@ Your progress will be saved. Would you like to upgrade now?`
                   markTyping();
                 }}
               />
+              {!isFieldSupportedByTemplate("portfolioLink") && (
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>This template does not display this field.</div>
+              )}
             </div>
                 </div>
               </div>
@@ -2960,7 +3053,7 @@ Your progress will be saved. Would you like to upgrade now?`
         {/* STEP 3: EXPERIENCE */}
         {step === 3 && (
           <>
-            <section>
+            <section style={!isSectionSupportedByTemplate("experience") ? { opacity: 0.7, pointerEvents: "none" } : undefined}>
               {resume.experience && resume.experience.length > 0 ? (
                 <div style={{ display: "grid", gap: 28 }}>
             {resume.experience.map((exp, idx) => (
@@ -3259,6 +3352,9 @@ Your progress will be saved. Would you like to upgrade now?`
             )}
               </div>
             </section>
+            {!isSectionSupportedByTemplate("experience") && (
+              <div style={{ fontSize: "12px", color: "#64748b", marginTop: "8px" }}>This template does not display this section.</div>
+            )}
           </>
         )}
 
@@ -3266,7 +3362,7 @@ Your progress will be saved. Would you like to upgrade now?`
         {step === 4 && (
           <>
             {/* EDUCATION SECTION */}
-            <section>
+            <section style={!isSectionSupportedByTemplate("education") ? { opacity: 0.7, pointerEvents: "none" } : undefined}>
               {resume.education && resume.education.length > 0 ? (
                 <div style={{ display: "grid", gap: 28 }}>
             {resume.education.map((edu, idx) => (
@@ -3494,13 +3590,16 @@ Your progress will be saved. Would you like to upgrade now?`
             )}
               </div>
             </section>
+            {!isSectionSupportedByTemplate("education") && (
+              <div style={{ fontSize: "12px", color: "#64748b", marginTop: "8px" }}>This template does not display this section.</div>
+            )}
           </>
         )}
 
         {/* STEP 5: SKILLS */}
         {step === 5 && (
           <>
-            <section>
+            <section style={!isSectionSupportedByTemplate("skills") ? { opacity: 0.7, pointerEvents: "none" } : undefined}>
               <div
                 style={{
                   padding: "20px",
@@ -3668,12 +3767,16 @@ Your progress will be saved. Would you like to upgrade now?`
                 )}
               </div>
             </section>
+            {!isSectionSupportedByTemplate("skills") && (
+              <div style={{ fontSize: "12px", color: "#64748b", marginTop: "8px" }}>This template does not display this section.</div>
+            )}
           </>
         )}
 
         {/* STEP 6: PROJECTS */}
         {step === 6 && (
           <>
+            <section style={!isSectionSupportedByTemplate("projects") ? { opacity: 0.7, pointerEvents: "none" } : undefined}>
             {resume.projects && resume.projects.length > 0 ? (
               resume.projects.map((proj, idx) => (
                 <div
@@ -3858,13 +3961,22 @@ Your progress will be saved. Would you like to upgrade now?`
               + Add Project
             </button>
               </div>
+            </section>
+            {!isSectionSupportedByTemplate("projects") && (
+              <div style={{ fontSize: "12px", color: "#64748b", marginTop: "8px" }}>This template does not display this section.</div>
+            )}
           </>
         )}
 
         {/* STEP 7: HOBBIES / AWARDS */}
         {step === 7 && (
           <>
-          <section style={{ marginBottom: 32 }}>
+          <section style={{
+            marginBottom: 32,
+            ...((!isSectionSupportedByTemplate("hobbies") && !isSectionSupportedByTemplate("awards"))
+              ? { opacity: 0.7, pointerEvents: "none" }
+              : {}),
+          }}>
             <div
                 style={{
                 padding: "20px",
@@ -3963,7 +4075,7 @@ Your progress will be saved. Would you like to upgrade now?`
             </div>
           </section>
 
-          <section>
+          <section style={(!isSectionSupportedByTemplate("hobbies") && !isSectionSupportedByTemplate("awards")) ? { opacity: 0.7, pointerEvents: "none" } : undefined}>
             <div
               style={{
                 padding: "20px",
@@ -4102,6 +4214,9 @@ Your progress will be saved. Would you like to upgrade now?`
               )}
             </div>
           </section>
+            {(!isSectionSupportedByTemplate("hobbies") && !isSectionSupportedByTemplate("awards")) && (
+              <div style={{ fontSize: "12px", color: "#64748b", marginTop: "8px" }}>This template does not display this section.</div>
+            )}
           </>
         )}
 
@@ -4117,6 +4232,9 @@ Your progress will be saved. Would you like to upgrade now?`
                   background: "#fff",
                   boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
                   marginBottom: 24,
+                  ...((!isFieldSupportedByTemplate("summary") && !isFieldSupportedByTemplate("professionalSummary"))
+                    ? { opacity: 0.7, pointerEvents: "none", position: "relative" }
+                    : {}),
                 }}
               >
               <label style={S.label}>
@@ -4233,7 +4351,14 @@ Your progress will be saved. Would you like to upgrade now?`
                     Write one above or use the AI Assistant to get started!
                 </div>
               )}
+
             </div>
+                {/* Template does not display summary - outside dimmed block so message stays visible */}
+                {(!isFieldSupportedByTemplate("summary") && !isFieldSupportedByTemplate("professionalSummary")) && (
+                  <div style={{ fontSize: "12px", color: "#64748b", marginTop: "8px" }}>
+                    This template does not display this field.
+                  </div>
+                )}
             </section>
           </>
         )}

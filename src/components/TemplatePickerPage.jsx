@@ -106,7 +106,7 @@ export default function TemplatePickerPage() {
             style={{
               margin: 0,
               fontSize: "2.25rem",
-              fontWeight: 800,
+              fontWeight: 750,
               color: "#0f172a",
               lineHeight: 1.2,
               marginBottom: 16,
@@ -203,7 +203,7 @@ export default function TemplatePickerPage() {
             alt=""
             style={{
               position: "absolute",
-              top: -120,
+              top: -100,
               left: 120,
               zIndex: 0,
               filter: "drop-shadow(0 0 28px rgba(86, 148, 248, 0.8)) drop-shadow(0 0 60px rgba(102, 159, 250, 0.55))",
@@ -215,7 +215,7 @@ export default function TemplatePickerPage() {
             alt=""
             style={{
               position: "absolute",
-              top: -60,
+              top: -50,
               left: 170,
               width: 360,
               height: "auto",
@@ -322,12 +322,12 @@ export default function TemplatePickerPage() {
         </div>
       </section>
 
-      {/* Template grid – dashboard templates */}
+      {/* Template grid – A3 preview, minimal side space */}
       <section
         style={{
           maxWidth: 1200,
           margin: "0 auto",
-          padding: "24px 24px 80px",
+          padding: "24px 12px 80px",
         }}
       >
         {loading ? (
@@ -335,14 +335,14 @@ export default function TemplatePickerPage() {
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-              gap: 24,
+              gap: 16,
             }}
           >
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
                 style={{
-                  height: 380,
+                  height: 520,
                   background: "linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)",
                   borderRadius: 16,
                   border: "1px solid #e2e8f0",
@@ -369,7 +369,7 @@ export default function TemplatePickerPage() {
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-              gap: 24,
+              gap: 16,
             }}
           >
             {filteredTemplates.map((t) => {
@@ -384,6 +384,7 @@ export default function TemplatePickerPage() {
                   locked={locked}
                   onSelect={() => handleSelect(t)}
                   onPreview={handlePreview}
+                  fullPreview
                 />
               );
             })}

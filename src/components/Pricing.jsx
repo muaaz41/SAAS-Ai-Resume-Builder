@@ -4,6 +4,8 @@ import Navbar from "./Navbar";
 import Footer from "./Footer";
 import priceMan from "../assets/price_man.png";
 import check from "../assets/check.png";
+import curveLineImg from "../assets/curve-line.png";
+import PortalImg from "../assets/Portal.png";
 import "../css/Pricing.css";
 import { api } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -425,6 +427,45 @@ const Pricing = () => {
   const isLoading = loading || loadingAction !== null;
 
   return (
+    <div
+      style={{
+        position: "relative",
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 40%, #faf5ff 100%)",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      }}
+    >
+      {/* Portals – small decorative images on the left (like rings on Template Picker) */}
+      {[
+        { top: "5%", left: "4%", size: 20 },
+        { top: "7%", left: "46%", size: 20 },
+        { top: "12%", left: "36%", size: 18 },
+        { top: "24%", left: "1%", size: 20 },
+        { top: "23%", left: "36%", size: 20 },
+        { top: "18%", left: "48%", size: 16 },
+        { top: "36%", left: "26%", size: 15 },
+        { top: "48%", left: "7%", size: 20 },
+        { top: "34%", left: "9%", size: 16 },
+        { top: "40%", left: "82%", size: 22 },
+        { top: "30%", left: "54%", size: 16 },
+      ].map((pos, i) => (
+        <img
+          key={i}
+          src={PortalImg}
+          alt=""
+          style={{
+            position: "absolute",
+            top: pos.top,
+            left: pos.left,
+            width: pos.size,
+            height: pos.size,
+            objectFit: "contain",
+            opacity: 0.85,
+            zIndex: 0,
+            pointerEvents: "none",
+          }}
+        />
+      ))}
     <main className="pricing">
       <Navbar />
 
@@ -662,7 +703,12 @@ const Pricing = () => {
             Create standout resumes, customize designs, and unlock powerful
             tools and choose the plan that fits your journey.
           </p>
-          <div className="arc-line" />
+          {/* Decorative curve – curve-line.png (same as Template Picker) */}
+          <img
+            src={curveLineImg}
+            alt=""
+            style={{ height: 62, width: "auto", marginBottom: 16, display: "block" }}
+          />
           <div className="ph-cta">
             <button className="btn-primary">Get Started</button>
             <a className="btn-secondary" href="#plans">
@@ -980,6 +1026,7 @@ const Pricing = () => {
 
       <Footer />
     </main>
+    </div>
   );
 };
 

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, FileText, GearSix, ArrowCircleUp, Crown, MagnifyingGlass } from "phosphor-react";
+import { User, FileText, GearSix, ArrowCircleUp, Crown, MagnifyingGlass, Copy } from "phosphor-react";
 import { ShieldCheck, UploadIcon } from "@phosphor-icons/react";
 import { api } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -8,6 +8,137 @@ import { showToast } from "../lib/toast";
 import { showAlert, showConfirm } from "../lib/alert.js";
 import Footer1 from "./Footer1.jsx";
 import ResumeUpload from "./ResumeUpload.jsx";
+import TemplateCard from "./TemplateCard.jsx";
+
+// A3 grid preview (same as TemplateCard – show full content)
+const A3_W = 842;
+const A3_H = 1191;
+const PREVIEW_H = 420;
+function injectA3GridPreview(html) {
+  const style =
+    "<style>" +
+    "html,body{margin:0;padding:0;width:842px;min-height:1191px;height:1191px;overflow:hidden;box-sizing:border-box;scrollbar-width:none;-ms-overflow-style:none;}" +
+    "html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;}" +
+    "*{box-sizing:border-box;}" +
+    "</style>";
+  if (typeof html !== "string") return html;
+  if (html.includes("<head>")) return html.replace("<head>", "<head>" + style);
+  return "<!DOCTYPE html><html><head>" + style + "</head><body>" + html + "</body></html>";
+}
+
+function ResumeCardPreview({ resumeId }) {
+  const containerRef = useRef(null);
+  const [width, setWidth] = useState(320);
+  const [html, setHtml] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!resumeId) return;
+    setLoading(true);
+    setError(false);
+    setHtml(null);
+    api
+      .get(`/api/v1/resumes/${resumeId}/preview`)
+      .then((res) => {
+        const h = res.data?.data?.html || res.data?.html || "";
+        setHtml(h || null);
+        setError(!h);
+      })
+      .catch(() => {
+        setError(true);
+        setHtml(null);
+      })
+      .finally(() => setLoading(false));
+  }, [resumeId]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width;
+      if (typeof w === "number") setWidth(w);
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  if (loading) {
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          height: PREVIEW_H,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f1f5f9",
+          color: "#64748b",
+          fontSize: 14,
+        }}
+      >
+        Loading preview…
+      </div>
+    );
+  }
+  if (error || !html) {
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          height: 200,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f1f5f9",
+          color: "#64748b",
+          fontSize: 13,
+        }}
+      >
+        Preview unavailable
+      </div>
+    );
+  }
+  const scale = Math.min(width / A3_W, PREVIEW_H / A3_H, 1);
+  const scaledHeight = Math.ceil(scale * A3_H);
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        height: scaledHeight,
+        background: "#f1f5f9",
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          width: A3_W,
+          height: A3_H,
+          transform: `scale(${scale})`,
+          transformOrigin: "top center",
+          flexShrink: 0,
+          boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+          overflow: "hidden",
+        }}
+      >
+        <iframe
+          title="Resume preview"
+          srcDoc={injectA3GridPreview(html)}
+          sandbox="allow-same-origin"
+          style={{
+            width: A3_W,
+            height: A3_H,
+            border: 0,
+            display: "block",
+            pointerEvents: "none",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function TemplateShowcase() {
   const navigate = useNavigate();
@@ -686,7 +817,7 @@ export default function TemplateShowcase() {
             display: "flex",
             flexDirection: "column",
             gap: 16,
-            padding: "0 24px",
+            padding: "0 12px",
           }}
         >
           <div>
@@ -818,8 +949,8 @@ export default function TemplateShowcase() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                    gap: 22,
+                    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                    gap: 16,
                   }}
                 >
                   {filteredTemplates.length === 0 ? (
@@ -837,96 +968,26 @@ export default function TemplateShowcase() {
                     </p>
                   ) : (
                     filteredTemplates.map((t) => {
-                      const accentColor = t.ui?.accentColor || "#2563eb";
-                      const cardBg = `linear-gradient(180deg, ${accentColor}12 0%, ${accentColor}08 30%, #fff 100%)`;
+                      const isPremium = t.category === "premium" || t.category === "industry";
+                      const locked = isPremium && !(subscriptionStatus?.hasActiveSubscription && subscriptionStatus?.plan !== "free");
                       return (
-                        <article
+                        <TemplateCard
                           key={t.slug}
-                          style={{
-                            borderRadius: 16,
-                            overflow: "hidden",
-                            background: "#fff",
-                            border: "1px solid #e5e7eb",
-                            boxShadow:
-                              "0 16px 35px rgba(15,23,42,0.08)",
-                            display: "flex",
-                            flexDirection: "column",
-                          }}
-                        >
-                          <div
-                            style={{
-                              padding: 14,
-                              background: cardBg,
-                              minHeight: 120,
-                              display: "flex",
-                              flexDirection: "column",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 14,
-                                fontWeight: 700,
-                                color: "#0f172a",
-                                marginBottom: 6,
-                              }}
-                            >
-                              {t.name || "Resume Template"}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: "#6b7280",
-                              }}
-                            >
-                              {(t.category || "premium")
-                                .charAt(0)
-                                .toUpperCase() +
-                                (t.category || "premium").slice(1)}
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              padding: "10px 14px 12px",
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              background: "#f9fafb",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 11,
-                                color: "#6b7280",
-                              }}
-                            >
-                              Click to start with this template
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                navigate("/builder", {
-                                  state: {
-                                    startFresh: true,
-                                    templateSlug: t.slug,
-                                  },
-                                })
-                              }
-                              style={{
-                                padding: "8px 14px",
-                                borderRadius: 999,
-                                border: "none",
-                                background: "#2563eb",
-                                color: "#fff",
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
-                            >
-                              Use Template
-                            </button>
-                          </div>
-                        </article>
+                          template={t}
+                          isPremium={isPremium}
+                          locked={locked}
+                          fullPreview
+                          onSelect={() =>
+                            navigate("/builder", {
+                              state: { startFresh: true, templateSlug: t.slug },
+                            })
+                          }
+                          onPreview={() =>
+                            navigate("/builder", {
+                              state: { startFresh: true, templateSlug: t.slug },
+                            })
+                          }
+                        />
                       );
                     })
                   )}
@@ -940,7 +1001,7 @@ export default function TemplateShowcase() {
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                gap: 22,
+                gap: 16,
               }}
             >
               {filteredResumes.length === 0 ? (
@@ -969,54 +1030,8 @@ export default function TemplateShowcase() {
                       flexDirection: "column",
                     }}
                   >
-                    {/* Resume preview — mini resume style */}
-                    <div
-                      style={{
-                        padding: 14,
-                        background: cardBg,
-                        minHeight: 240,
-                        display: "flex",
-                        flexDirection: "column",
-                        flex: 1,
-                      }}
-                    >
-                      <div
-                        style={{
-                          flex: 1,
-                          borderRadius: 12,
-                          overflow: "hidden",
-                          background: "#fff",
-                          boxShadow: "0 4px 16px rgba(15,23,42,0.08), 0 0 0 1px rgba(148,163,184,0.15)",
-                          display: "flex",
-                          flexDirection: "column",
-                        }}
-                      >
-                        <div style={{ height: 4, background: accentColor }} />
-                        <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-                          <div
-                            style={{
-                              width: "36%",
-                              padding: "10px 8px",
-                              background: `${accentColor}18`,
-                              fontSize: 8,
-                              color: "#374151",
-                              fontWeight: 600,
-                            }}
-                          >
-                            <div style={{ marginBottom: 6 }}>Profile</div>
-                            <div style={{ marginBottom: 6 }}>Education</div>
-                            <div>Skills</div>
-                          </div>
-                          <div style={{ flex: 1, padding: "10px 8px", fontSize: 8, color: "#6b7280" }}>
-                            <div style={{ fontWeight: 700, fontSize: 9, color: "#111", marginBottom: 4 }}>
-                              {r.title || "Untitled Resume"}
-                            </div>
-                            <div style={{ marginBottom: 6 }}>Experience • Contact</div>
-                            <div>Summary</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Full template preview (fetch then scale A4, like picker grid) */}
+                    <ResumeCardPreview resumeId={resumeId} />
                     {/* Footer — dark bar with template name, Last Edited, and icon actions */}
                     <div
                       style={{
@@ -1025,7 +1040,7 @@ export default function TemplateShowcase() {
                         justifyContent: "space-between",
                         flexWrap: "wrap",
                         gap: 8,
-                        padding: "10px 14px 12px",
+                        padding: "20px 14px 12px",
                         background: "#374151",
                         borderRadius: "0 0 16px 16px",
                       }}
@@ -1074,7 +1089,7 @@ export default function TemplateShowcase() {
                           style={{ ...iconBtnStyle, opacity: duplicating === resumeId || resumes.length >= 5 ? 0.5 : 1 }}
                           title="Duplicate"
                         >
-                          {iconSvg(<path d="M7.5 3.75H6A2.25 2.25 0 003.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0120.25 6v1.5m0 9V18A2.25 2.25 0 0118 20.25h-1.5m-9 0H6A2.25 2.25 0 013.75 18v-1.5M15 12a3 3 0 11-6 0 3 3 0 016 0z" />, "0 0 24 24")}
+                          <Copy size={18} color="currentColor" />
                         </button>
                       </div>
                     </div>

@@ -1,6 +1,24 @@
 import { DotsNine, Eye, FileText, LockKey, PaletteIcon, Sparkle } from "@phosphor-icons/react";
 import { Camera } from "@phosphor-icons/react/dist/ssr";
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
+
+// A3 dimensions in px at 72dpi (for grid preview only – show full content)
+const A3_WIDTH = 842;
+const A3_HEIGHT = 1191;
+const CARD_PREVIEW_HEIGHT = 420;
+
+/** Inject A3 page sizing for grid preview: hide scrollbar, no extra scale (we scale the wrapper) */
+function injectA3GridPreview(html) {
+  const style =
+    "<style>" +
+    "html,body{margin:0;padding:0;width:842px;min-height:1191px;height:1191px;overflow:hidden;box-sizing:border-box;scrollbar-width:none;-ms-overflow-style:none;}" +
+    "html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;}" +
+    "*{box-sizing:border-box;}" +
+    "</style>";
+  if (typeof html !== "string") return html;
+  if (html.includes("<head>")) return html.replace("<head>", "<head>" + style);
+  return "<!DOCTYPE html><html><head>" + style + "</head><body>" + html + "</body></html>";
+}
 
 const TemplateCard = ({
   template,
@@ -8,7 +26,49 @@ const TemplateCard = ({
   locked = false,
   onSelect,
   onPreview,
+  fullPreview = false,
 }) => {
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(320);
+  const [previewHtml, setPreviewHtml] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
+
+  // Fetch full template preview when fullPreview is true (for grid)
+  useEffect(() => {
+    if (!fullPreview || !template?.slug) return;
+    setPreviewLoading(true);
+    setPreviewError(false);
+    setPreviewHtml(null);
+    const url = `/api/v1/templates/${template.slug}/preview`;
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(res.statusText);
+        return res.text();
+      })
+      .then((html) => {
+        setPreviewHtml(html);
+        setPreviewError(false);
+      })
+      .catch(() => {
+        setPreviewError(true);
+        setPreviewHtml(null);
+      })
+      .finally(() => setPreviewLoading(false));
+  }, [fullPreview, template?.slug]);
+
+  // Measure container width for scale factor
+  useEffect(() => {
+    if (!fullPreview || !containerRef.current) return;
+    const el = containerRef.current;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width;
+      if (typeof w === "number") setContainerWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fullPreview]);
+
   // Safety checks for template properties
   const accentColor = template?.ui?.accentColor || "#2563eb";
   const fontFamily = template?.ui?.fontFamily || "Arial, sans-serif";
@@ -157,14 +217,15 @@ const TemplateCard = ({
         </div>
       )}
 
-      {/* Template Preview Area (uses real thumbnail when available) */}
+      {/* Template Preview Area (fullPreview: A3 scaled to fit, no extra side space) */}
       <div
+        ref={fullPreview ? containerRef : undefined}
         className="preview-mockup"
         style={{
-          height: "240px",
-          background: `linear-gradient(135deg, ${accentColor}08, ${accentColor}02)`,
+          height: fullPreview ? `${CARD_PREVIEW_HEIGHT}px` : "240px",
+          background: fullPreview ? "#f1f5f9" : `linear-gradient(135deg, ${accentColor}08, ${accentColor}02)`,
           borderRadius: "12px",
-          padding: thumbnailSrc ? 0 : "16px",
+          padding: fullPreview ? 0 : thumbnailSrc || previewSrc ? 0 : "16px",
           marginBottom: "16px",
           display: "flex",
           flexDirection: "column",
@@ -173,7 +234,108 @@ const TemplateCard = ({
           overflow: "hidden",
           border: `1px solid ${accentColor}20`,
         }}>
-        {previewSrc ? (
+        {fullPreview && previewHtml ? (
+          /* A3 preview: scale to fit card so all content visible, no extra side space */
+          (() => {
+            const scale = Math.min(
+              containerWidth / A3_WIDTH,
+              CARD_PREVIEW_HEIGHT / A3_HEIGHT,
+              1
+            );
+            return (
+              <div
+                style={{
+                  width: "100%",
+                  height: CARD_PREVIEW_HEIGHT,
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "center",
+                  background: "#f1f5f9",
+                  borderRadius: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    width: A3_WIDTH,
+                    height: A3_HEIGHT,
+                    transform: `scale(${scale})`,
+                    transformOrigin: "top center",
+                    flexShrink: 0,
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <iframe
+                    title={`${name} full preview`}
+                    srcDoc={injectA3GridPreview(previewHtml)}
+                    sandbox="allow-same-origin"
+                    style={{
+                      width: A3_WIDTH,
+                      height: A3_HEIGHT,
+                      border: 0,
+                      display: "block",
+                      pointerEvents: "none",
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })()
+        ) : fullPreview && previewLoading ? (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "#f1f5f9",
+              borderRadius: "12px",
+              color: "#64748b",
+              fontSize: 14,
+            }}
+          >
+            Loading preview…
+          </div>
+        ) : fullPreview && previewError ? (
+          thumbnailSrc ? (
+            <img
+              src={thumbnailSrc}
+              alt={`${name} thumbnail`}
+              loading="lazy"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                display: "block",
+                borderRadius: "12px",
+                background: "#f8fafc",
+              }}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#f1f5f9",
+                borderRadius: "12px",
+                color: "#64748b",
+                fontSize: 13,
+                textAlign: "center",
+                padding: 16,
+              }}
+            >
+              Preview unavailable
+            </div>
+          )
+        ) : previewSrc ? (
           <iframe
             title={`${name} preview`}
             src={previewSrc}
@@ -197,9 +359,10 @@ const TemplateCard = ({
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover",
+              objectFit: fullPreview ? "contain" : "cover",
               display: "block",
               borderRadius: "12px",
+              background: fullPreview ? "#f8fafc" : undefined,
             }}
             onError={(e) => {
               e.currentTarget.style.display = "none";

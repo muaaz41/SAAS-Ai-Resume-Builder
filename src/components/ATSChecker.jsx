@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import heroImg from "../assets/hero.png";
 import frameImg from "../assets/Frame.png";
 import lineCombinedImg from "../assets/linecombined.png";
+import curveLineImg from "../assets/curve-line.png";
 import "../css/ATSChecker.css";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
@@ -250,6 +251,32 @@ const ATSChecker = () => {
             Scan your resume against applicant tracking systems (ATS), fix
             errors, and boost your chances of getting noticed.
           </p>
+          <img
+            src={curveLineImg}
+            alt=""
+            style={{ height: 76, width: "auto", marginBottom: 18, marginTop: 0, display: "block" }}
+          />
+          {[
+        { top: "95%", left: "4%", size: 60 },
+        { top: "75%", left: "72%", size: 60 },
+      ].map((pos, i) => (
+        <img
+          key={i}
+          src={frameImg}
+          alt=""
+          style={{
+            position: "absolute",
+            top: pos.top,
+            left: pos.left,
+            width: pos.size,
+            height: pos.size,
+            objectFit: "contain",
+            opacity: 0.85,
+            zIndex: 0,
+            pointerEvents: "none",
+          }}
+        />
+      ))}
           <div className="ats-hero-cta">
             <button className="btn-primary">Start Free ATS Scan</button>
             <Link to="#how-it-works" className="btn-secondary">

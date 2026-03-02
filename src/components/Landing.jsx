@@ -12,6 +12,9 @@ import arrowImg from "../assets/arrow.png";
 import testiBg from "../assets/BG.png";
 import boysImg from "../assets/boys.png";
 import curveImg from "../assets/Line7.png";
+import curveLineImg from "../assets/curve-line.png";
+import portalImg from "../assets/Portal.png";
+import arrowsImg from "../assets/arrow-1.png";
 import starsImg from "../assets/5stars.png";
 import avatar1 from "../assets/avatar1.png";
 import avatar2 from "../assets/avatar2.png";
@@ -85,6 +88,37 @@ const Landing = () => {
             Let AI do the work for you. Choose from dozens of templates, add
             ready-to-use skills and phrases, and land your dream job.
           </p>
+          <img
+            src={curveLineImg}
+            alt=""
+            style={{ height: 46, width: "auto", marginBottom: 18, marginTop: 0, display: "block" }}
+          />
+          {[
+            { top: "30%", left: "90%", size: 12 },
+            { top: "27%", left: "68%", size: 12 },
+            { top: "110%", left: "50%", size: 16 },
+            { top: "65%", left: "45%", size: 16 },
+            { top: "77%", left: "30%", size: 12 },
+            { top: "99%", left: "12%", size: 16 },
+            { top: "48%", left: "7%", size: 20 },
+          ].map((pos, i) => (
+            <img
+              key={i}
+              src={portalImg}
+              alt=""
+              style={{
+                position: "absolute",
+                top: pos.top,
+                left: pos.left,
+                width: pos.size,
+                height: pos.size,
+                objectFit: "contain",
+                opacity: 0.85,
+                zIndex: 0,
+                pointerEvents: "none",
+              }}
+            />
+          ))}
 
           <div className="hero-cta-row">
             <button
@@ -92,6 +126,11 @@ const Landing = () => {
               onClick={() => navigate("/resume-start")}>
               Create My Resume
             </button>
+            <img
+              src={arrowsImg}
+              alt=""
+              style={{ marginTop: 70, marginLeft: -112, height: 52, width: "auto", display: "block" }}
+            />
             <div className="active-users">
               <img
                 src={peopleImg}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.js";
@@ -11,22 +11,38 @@ export default function VerifyEmailPrompt() {
   const navigate = useNavigate();
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const sentRef = useRef(false); // Prevent duplicate sends
 
+  // Cooldown timer effect
+  useEffect(() => {
+    let interval;
+    if (cooldown > 0) {
+      interval = setInterval(() => {
+        setCooldown(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [cooldown]);
+
   const handleSend = async () => {
-    // Prevent duplicate sends
-    if (sending || sentRef.current) return;
+    // Prevent duplicate sends or during cooldown
+    if (sending || cooldown > 0) return;
     
     setSending(true);
-    sentRef.current = true;
     try {
       await api.post("/api/v1/auth/send-verification");
       setSent(true);
-      showToast("Verification email sent", { type: "success" });
+      setCooldown(60); // 60 second cooldown
+      showToast("Verification email sent successfully!", { type: "success" });
+      
+      // Reset sent status after showing success for a moment
+      setTimeout(() => {
+        setSent(false);
+      }, 2000);
     } catch (err) {
       console.error(err);
-      sentRef.current = false; // Reset on error so user can retry
-      showToast("Failed to send verification email", { type: "error" });
+      showToast("Failed to send verification email. Please try again.", { type: "error" });
     } finally {
       setSending(false);
     }
@@ -56,36 +72,71 @@ export default function VerifyEmailPrompt() {
           <p style={{ margin: "0 0 16px", color: "#475569" }}>
             Didn't get it? You can resend the email below.
           </p>
-          {/* <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
             <button
               onClick={handleSend}
-              disabled={sending}
+              disabled={sending || sent || cooldown > 0}
               style={{
-                background: "#2563eb",
+                background: sending || sent || cooldown > 0 ? "#94a3b8" : "#2563eb",
                 color: "#fff",
                 border: "none",
-                padding: "10px 16px",
+                padding: "12px 20px",
                 borderRadius: 8,
                 fontWeight: 600,
-                cursor: "pointer",
-                flex: 1,
+                cursor: sending || sent || cooldown > 0 ? "not-allowed" : "pointer",
+                fontSize: "14px",
+                transition: "all 0.2s ease",
+                opacity: sending || sent || cooldown > 0 ? 0.7 : 1,
+                minWidth: "140px",
+              }}
+              onMouseEnter={(e) => {
+                if (!sending && !sent && cooldown === 0) {
+                  e.target.style.background = "#1d4ed8";
+                  e.target.style.transform = "translateY(-1px)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!sending && !sent && cooldown === 0) {
+                  e.target.style.background = "#2563eb";
+                  e.target.style.transform = "translateY(0)";
+                }
               }}>
-              {sending ? "Sending..." : sent ? "Resend email" : "Send verification email"}
+              {sending ? "Sending..." : 
+               sent ? "Email Sent!" : 
+               cooldown > 0 ? `Resend (${cooldown}s)` : 
+               "Resend Email"}
             </button>
             <button
               onClick={() => navigate("/dashboard")}
               style={{
                 background: "#fff",
-                color: "#2563eb",
-                border: "1px solid #2563eb",
-                padding: "10px 16px",
+                color: "#64748b",
+                border: "1px solid #d1d5db",
+                padding: "12px 20px",
                 borderRadius: 8,
                 fontWeight: 600,
                 cursor: "pointer",
+                fontSize: "14px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = "#f8fafc";
+                e.target.style.borderColor = "#9ca3af";
+                e.target.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = "#fff";
+                e.target.style.borderColor = "#d1d5db";
+                e.target.style.transform = "translateY(0)";
               }}>
               I'll verify later
             </button>
-          </div> */}
+          </div>
+          {cooldown > 0 && (
+            <p style={{ margin: "0 0 12px", fontSize: "13px", color: "#f59e0b", background: "#fef3c7", padding: "8px 12px", borderRadius: 6, border: "1px solid #fde68a" }}>
+              Please wait {cooldown} seconds before requesting another email.
+            </p>
+          )}
           <p style={{ margin: "16px 0 0", fontSize: "12px", color: "#94a3b8" }}>
             Note: Some features require email verification to access.
           </p>

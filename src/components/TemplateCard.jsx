@@ -5,15 +5,27 @@ import React, { useState, useEffect, useRef } from "react";
 // A3 dimensions in px at 72dpi (for grid preview only – show full content)
 const A3_WIDTH = 842;
 const A3_HEIGHT = 1191;
-const CARD_PREVIEW_HEIGHT = 420;
+const CARD_PREVIEW_HEIGHT = 460;
 
-/** Inject A3 page sizing for grid preview: hide scrollbar, no extra scale (we scale the wrapper) */
+/** Same as profile page (TemplateShowcase ResumeCardPreview) */
 function injectA3GridPreview(html) {
   const style =
     "<style>" +
-    "html,body{margin:0;padding:0;width:842px;min-height:1191px;height:1191px;overflow:hidden;box-sizing:border-box;scrollbar-width:none;-ms-overflow-style:none;}" +
+    "html,body{margin:0 !important;padding:0 !important;width:842px;min-height:1191px;height:1191px;overflow:hidden;box-sizing:border-box;scrollbar-width:none;-ms-overflow-style:none;background:#ffffff !important;}" +
     "html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;}" +
     "*{box-sizing:border-box;}" +
+    "body>*{width:100% !important;max-width:100% !important;margin-left:0 !important;margin-right:0 !important;}" +
+    "main,section,article,[class*='container'],[class*='wrapper'],[id*='container'],[id*='wrapper']{max-width:100% !important;}" +
+    "[class*='resume'],[id*='resume']{max-width:100% !important;margin-left:0 !important;margin-right:0 !important;}" +
+    /* jsonresume-theme-paper (engineering-lead): .paper 60% + .content-wrapper side padding */
+    ".resume-wrapper{width:100% !important;max-width:100% !important;display:block !important;}" +
+    ".paper,article.paper{width:100% !important;max-width:100% !important;margin:0 auto 0 auto !important;border:1px solid #e5e7eb !important;border-bottom-width:2px !important;border-radius:4px !important;}" +
+    ".content-wrapper{padding:0 !important;margin:0 !important;}" +
+    /* jsonresume-theme-macchiato: .page fixed at 612px */
+    ".page{width:100% !important;max-width:100% !important;min-height:0 !important;margin:0 !important;box-shadow:none !important;padding:24px 14px 18px 16px !important;}" +
+    /* #resume: short (data-scientist) + onepage (hr-professional — huge padding 80px 100px) */
+    "#resume{width:100% !important;max-width:100% !important;margin:0 !important;padding:12px 14px !important;box-sizing:border-box !important;border:none !important;box-shadow:none !important;background:#ffffff !important;}" +
+    ".resume.talha-professional,.resume.strassburg-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
     "</style>";
   if (typeof html !== "string") return html;
   if (html.includes("<head>")) return html.replace("<head>", "<head>" + style);
@@ -178,14 +190,15 @@ const TemplateCard = ({
     <div
       className="template-card"
       style={{
-        border: `2px solid ${accentColor}`,
+        border: fullPreview ? "1px solid #e2e8f0" : `2px solid ${accentColor}`,
         borderRadius: "12px",
-        padding: "20px",
+        padding: fullPreview ? 0 : "20px",
         background: "white",
         position: "relative",
         cursor: "pointer",
         transition: "all 0.3s ease",
         boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+        overflow: fullPreview ? "hidden" : "visible",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "translateY(-4px)";
@@ -200,8 +213,8 @@ const TemplateCard = ({
         <div
           style={{
             position: "absolute",
-            top: "8px",
-            right: "8px",
+            top: fullPreview ? "10px" : "8px",
+            right: fullPreview ? "10px" : "8px",
             background: "linear-gradient(135deg, #fbbf24, #d97706)",
             color: "#ffffff",
             padding: "4px 12px",
@@ -223,25 +236,21 @@ const TemplateCard = ({
         className="preview-mockup"
         style={{
           height: fullPreview ? `${CARD_PREVIEW_HEIGHT}px` : "240px",
-          background: fullPreview ? "#f1f5f9" : `linear-gradient(135deg, ${accentColor}08, ${accentColor}02)`,
-          borderRadius: "12px",
+          background: fullPreview ? "#ffffff" : `linear-gradient(135deg, ${accentColor}08, ${accentColor}02)`,
+          borderRadius: fullPreview ? "10px 10px 0 0" : "12px",
           padding: fullPreview ? 0 : thumbnailSrc || previewSrc ? 0 : "16px",
-          marginBottom: "16px",
+          marginBottom: fullPreview ? 0 : "16px",
           display: "flex",
           flexDirection: "column",
-          gap: "6px",
+          gap: fullPreview ? 0 : "6px",
           position: "relative",
           overflow: "hidden",
-          border: `1px solid ${accentColor}20`,
+          border: fullPreview ? "none" : `1px solid ${accentColor}20`,
         }}>
         {fullPreview && previewHtml ? (
-          /* A3 preview: scale to fit card so all content visible, no extra side space */
+          /* Same layout as profile page ResumeCardPreview: width-fill scale, top-left origin */
           (() => {
-            const scale = Math.min(
-              containerWidth / A3_WIDTH,
-              CARD_PREVIEW_HEIGHT / A3_HEIGHT,
-              1
-            );
+            const scale = Math.max(containerWidth / A3_WIDTH, 0.1);
             return (
               <div
                 style={{
@@ -250,9 +259,8 @@ const TemplateCard = ({
                   overflow: "hidden",
                   display: "flex",
                   alignItems: "flex-start",
-                  justifyContent: "center",
-                  background: "#f1f5f9",
-                  borderRadius: "12px",
+                  justifyContent: "flex-start",
+                  borderRadius: "10px 10px 0 0",
                 }}
               >
                 <div
@@ -260,9 +268,8 @@ const TemplateCard = ({
                     width: A3_WIDTH,
                     height: A3_HEIGHT,
                     transform: `scale(${scale})`,
-                    transformOrigin: "top center",
+                    transformOrigin: "top left",
                     flexShrink: 0,
-                    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
                     overflow: "hidden",
                   }}
                 >
@@ -851,6 +858,7 @@ const TemplateCard = ({
         )}
       </div>
 
+      <div style={fullPreview ? { padding: "16px 20px 20px" } : undefined}>
       {/* Template Info */}
       <div style={{ marginBottom: "12px" }}>
         <h3
@@ -876,7 +884,7 @@ const TemplateCard = ({
       </div>
 
       {/* Tags */}
-      {tags.length > 0 && (
+      {/* {tags.length > 0 && (
         <div
           style={{
             display: "flex",
@@ -914,10 +922,10 @@ const TemplateCard = ({
             </span>
           )}
         </div>
-      )}
+      )} */}
 
       {/* Features */}
-      <div style={{ fontSize: "13px", color: "#475569", marginBottom: "16px" }}>
+      {/* <div style={{ fontSize: "13px", color: "#475569", marginBottom: "16px" }}>
         <div
           style={{
             display: "flex",
@@ -952,7 +960,7 @@ const TemplateCard = ({
             {bulletStyle === "dot" ? "Round Bullets" : "Square Bullets"}
           </span>
         </div>
-      </div>
+      </div> */}
 
       {/* Action Buttons */}
       <div style={{ display: "flex", gap: "8px" }}>
@@ -1052,6 +1060,7 @@ const TemplateCard = ({
           Premium / Industry template – requires subscription
         </div>
       )}
+      </div>
 
       {/* CSS Animations */}
       <style>{`

@@ -423,6 +423,23 @@
   cursor: not-allowed;
 }
 
+.admin-btn-end-subscription {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.admin-btn-end-subscription:hover:not(:disabled) {
+  background: #fde68a;
+  color: #78350f;
+  transform: translateY(-1px);
+}
+
+.admin-btn-end-subscription:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Activity / metric blocks */
 .admin-metric-block {
   background: #f8fafc;

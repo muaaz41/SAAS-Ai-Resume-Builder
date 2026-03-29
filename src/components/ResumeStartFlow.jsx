@@ -19,6 +19,10 @@ const ResumeStartFlow = () => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
+  /** Slug from template picker before upload (existing-resume flow) */
+  const [uploadTemplateSlug, setUploadTemplateSlug] = useState(null);
+  /** Which entry path opened the template modal: scratch → builder; upload → upload modal next */
+  const [templateFlow, setTemplateFlow] = useState(null);
   const [previewTemplate, setPreviewTemplate] = useState(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [importingLinkedIn, setImportingLinkedIn] = useState(false);
@@ -64,19 +68,23 @@ const ResumeStartFlow = () => {
     });
   };
 
-  const handleUploadClick = () => {
-    // Allow both logged in and non-logged in users to upload
-    setShowUpload(true);
+  const openTemplateModalForScratch = () => {
+    if (templates.length > 0) {
+      setTemplateFlow("scratch");
+      setShowTemplateModal(true);
+    }
   };
 
-  const handleUploadComplete = (resumeId, templateSlug) => {
-    setShowUpload(false);
-    navigate("/builder", {
-      state: {
-        resumeId,
-        templateSlug,
-      },
-    });
+  const openTemplateModalForUpload = () => {
+    if (templates.length > 0) {
+      setTemplateFlow("upload");
+      setShowTemplateModal(true);
+    }
+  };
+
+  const closeTemplateModal = () => {
+    setShowTemplateModal(false);
+    setTemplateFlow(null);
   };
 
   const handleLinkedInImport = () => {
@@ -236,11 +244,7 @@ const ResumeStartFlow = () => {
               e.currentTarget.style.borderColor = "#e5e7eb";
               e.currentTarget.style.boxShadow = "none";
             }}
-            onClick={() => {
-              if (templates.length > 0) {
-                setShowTemplateModal(true);
-              }
-            }}>
+            onClick={openTemplateModalForScratch}>
             <div
               style={{
                 fontSize: "48px",
@@ -291,7 +295,7 @@ const ResumeStartFlow = () => {
               e.currentTarget.style.borderColor = "#e5e7eb";
               e.currentTarget.style.boxShadow = "none";
             }}
-            onClick={handleUploadClick}>
+            onClick={openTemplateModalForUpload}>
             <div
               style={{
                 fontSize: "48px",
@@ -317,9 +321,9 @@ const ResumeStartFlow = () => {
                 textAlign: "center",
                 lineHeight: "1.6",
               }}>
-              Upload your current resume (PDF or Word) and we'll extract all
-              your information automatically. Then customize it with our
-              templates.
+              Choose a template first (preview or select), then upload your
+              resume (PDF or Word). We extract your information and keep the
+              same import-and-edit flow as before.
             </p>
           </div>
         </div>
@@ -338,7 +342,7 @@ const ResumeStartFlow = () => {
               padding: "20px",
               overflow: "auto",
             }}
-            onClick={() => setShowTemplateModal(false)}
+            onClick={closeTemplateModal}
           >
             <div
               style={{
@@ -372,7 +376,7 @@ const ResumeStartFlow = () => {
                   Choose a Template
                 </h2>
                 <button
-                  onClick={() => setShowTemplateModal(false)}
+                  onClick={closeTemplateModal}
                   style={{
                     background: "none",
                     border: "none",
@@ -393,7 +397,9 @@ const ResumeStartFlow = () => {
                   marginBottom: "24px",
                 }}
               >
-                Preview any template or use it to start building your resume.
+                {templateFlow === "upload"
+                  ? "Pick a template (preview or select). Next, you’ll upload your existing resume — same import flow as before."
+                  : "Preview any template or use it to start building your resume."}
               </p>
 
               {loading ? (
@@ -450,8 +456,15 @@ const ResumeStartFlow = () => {
                         locked={false}
                         fullPreview
                         onSelect={() => {
+                          const flow = templateFlow;
                           setShowTemplateModal(false);
-                          handleContinueToBuilder(t);
+                          setTemplateFlow(null);
+                          if (flow === "upload") {
+                            setUploadTemplateSlug(t.slug);
+                            setShowUpload(true);
+                          } else {
+                            handleContinueToBuilder(t);
+                          }
                         }}
                         onPreview={(template) => {
                           setShowTemplateModal(false);
@@ -467,10 +480,14 @@ const ResumeStartFlow = () => {
         )}
 
         {/* Upload Modal */}
-        {showUpload && (
+        {showUpload && uploadTemplateSlug && (
           <ResumeUpload
-            onClose={() => setShowUpload(false)}
-            onImport={handleUploadComplete}
+            onClose={() => {
+              setShowUpload(false);
+              setUploadTemplateSlug(null);
+            }}
+            selectedTemplateSlug={uploadTemplateSlug}
+            hideTemplatePicker
           />
         )}
 
@@ -479,7 +496,17 @@ const ResumeStartFlow = () => {
           <TemplatePreviewModal
             template={previewTemplate}
             onClose={() => setPreviewTemplate(null)}
-            onContinue={handleContinueToBuilder}
+            onContinue={(t) => {
+              const flow = templateFlow;
+              setPreviewTemplate(null);
+              setTemplateFlow(null);
+              if (flow === "upload") {
+                setUploadTemplateSlug(t.slug);
+                setShowUpload(true);
+              } else {
+                handleContinueToBuilder(t);
+              }
+            }}
           />
         )}
       </main>
@@ -487,6 +514,22 @@ const ResumeStartFlow = () => {
     </div>
   );
 };
+
+function injectModalPreview(html) {
+  if (!html || typeof html !== "string") return html;
+  const css = [
+    "html,body{margin:0 !important;padding:0 !important;background:#fff !important;width:100% !important;max-width:100% !important;overflow-x:hidden !important;}",
+    ".resume-wrapper{width:100% !important;max-width:100% !important;display:block !important;}",
+    ".paper,article.paper{width:100% !important;max-width:100% !important;margin:0 !important;}",
+    ".content-wrapper{padding:0 !important;margin:0 !important;}",
+    ".page{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;}",
+    "#resume{width:100% !important;max-width:100% !important;margin:0 !important;padding:12px 14px !important;border:none !important;box-shadow:none !important;}",
+    ".talha-wrapper,.strassburg-wrapper{max-width:100% !important;width:100% !important;padding:0 !important;margin:0 !important;}",
+  ].join("");
+  if (html.includes("</head>")) return html.replace("</head>", `<style>${css}</style></head>`);
+  if (html.includes("<body")) return html.replace(/<body[^>]*>/i, (m) => `${m}<style>${css}</style>`);
+  return `<style>${css}</style>${html}`;
+}
 
 // Template Preview Modal Component
 function TemplatePreviewModal({ template, onClose, onContinue }) {
@@ -638,11 +681,11 @@ function TemplatePreviewModal({ template, onClose, onContinue }) {
           style={{
             flex: 1,
             overflow: "auto",
-            background: "#f1f5f9",
+            background: "#fff",
             display: "flex",
             justifyContent: "center",
             alignItems: "flex-start",
-            padding: "32px 20px",
+            padding: 0,
           }}
         >
           {loading ? (
@@ -674,22 +717,22 @@ function TemplatePreviewModal({ template, onClose, onContinue }) {
           ) : (
             <div
               style={{
-                width: "210mm",
-                minHeight: "297mm",
+                width: "100%",
+                minHeight: "100%",
                 background: "#fff",
-                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
-                borderRadius: "8px",
+                boxShadow: "none",
+                borderRadius: 0,
                 overflow: "hidden",
-                border: "1px solid #d1d5db",
+                border: "none",
               }}
             >
               <iframe
-                srcDoc={previewHtml}
+                srcDoc={injectModalPreview(previewHtml)}
                 title="Resume Preview"
                 style={{
                   width: "100%",
                   height: "100%",
-                  minHeight: "297mm",
+                  minHeight: "calc(92vh - 140px)",
                   border: "none",
                   background: "#fff",
                   display: "block",

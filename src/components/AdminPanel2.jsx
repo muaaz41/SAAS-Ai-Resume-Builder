@@ -476,6 +476,7 @@ export default function AdminPanel() {
   const [dataLoading, setDataLoading] = useState(true);
   const [deletingUserId, setDeletingUserId] = useState(null);
   const [updatingRoleUserId, setUpdatingRoleUserId] = useState(null);
+  const [endingSubscriptionUserId, setEndingSubscriptionUserId] = useState(null);
   const [activeTab, setActiveTab] = useState("overview"); // overview, templates, users, activity
   const [showTemplateUpload, setShowTemplateUpload] = useState(false);
   const [templates, setTemplates] = useState([]);
@@ -655,6 +656,43 @@ export default function AdminPanel() {
       showToast(errorMsg, { type: "error" });
     } finally {
       setUpdatingRoleUserId(null);
+    }
+  };
+
+  const handleEndUserSubscription = async (userId, userName, plan) => {
+    const confirmed = await showConfirm(
+      `End subscription for "${userName}"?\n\nCurrent plan: ${plan || "free"}\nThis will cancel the user's active paid subscription.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setEndingSubscriptionUserId(userId);
+      await api.post(`/api/v1/admin/users/${userId}/cancel-subscription`);
+      showToast(`Subscription ended for "${userName}"`, { type: "success" });
+
+      const [usersRes, statsRes] = await Promise.all([
+        api.get("/api/v1/admin/users?limit=100"),
+        api.get("/api/v1/admin/dashboard-stats"),
+      ]);
+      setUsers(usersRes.data?.data?.users || []);
+      const data = statsRes.data?.data || {};
+      setStats({
+        totalResumes: data.stats?.totalResumes || 0,
+        totalUsers: data.stats?.totalUsers || 0,
+        verifiedUsers: data.stats?.verifiedUsers || 0,
+        premiumUsers: data.stats?.premiumUsers || 0,
+        activeUsers: data.stats?.activeUsers || 0,
+        deletedUsers: data.stats?.deletedUsers || 0,
+        newUsersToday: data.stats?.newUsersToday || 0,
+        newResumesToday: data.stats?.newResumesToday || 0,
+      });
+      setTemplateUsage(data.templateUsage || []);
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.message || err.message || "Failed to end subscription";
+      showToast(errorMsg, { type: "error" });
+    } finally {
+      setEndingSubscriptionUserId(null);
     }
   };
 
@@ -1210,6 +1248,28 @@ export default function AdminPanel() {
                             
                             return (
                               <div className="admin-actions-group">
+                                {(u.stripeSubscriptionId ||
+                                  u.plan === "premium" ||
+                                  u.plan === "professional" ||
+                                  u.subscriptionStatus === "active" ||
+                                  u.subscriptionStatus === "trialing") && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleEndUserSubscription(
+                                        userId,
+                                        u.name || u.email,
+                                        u.plan
+                                      )
+                                    }
+                                    disabled={endingSubscriptionUserId === userId}
+                                    className="admin-btn admin-btn-end-subscription"
+                                    title="Cancel this user's active subscription"
+                                  >
+                                    <Stack size={14} />
+                                    {endingSubscriptionUserId === userId ? "Ending..." : "End Subscription"}
+                                  </button>
+                                )}
                                 {u.role !== "admin" ? (
                                   <button
                                     type="button"

@@ -17,9 +17,20 @@ const PREVIEW_H = 420;
 function injectA3GridPreview(html) {
   const style =
     "<style>" +
-    "html,body{margin:0;padding:0;width:842px;min-height:1191px;height:1191px;overflow:hidden;box-sizing:border-box;scrollbar-width:none;-ms-overflow-style:none;}" +
+    "html,body{margin:0 !important;padding:0 !important;width:842px;min-height:1191px;height:1191px;overflow:hidden;box-sizing:border-box;scrollbar-width:none;-ms-overflow-style:none;background:#ffffff !important;}" +
     "html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;}" +
     "*{box-sizing:border-box;}" +
+    // Force common wrapper patterns to full width in card previews
+    "body>*{width:100% !important;max-width:100% !important;margin-left:0 !important;margin-right:0 !important;}" +
+    "main,section,article,[class*='container'],[class*='wrapper'],[id*='container'],[id*='wrapper']{max-width:100% !important;}" +
+    "[class*='resume'],[id*='resume']{max-width:100% !important;margin-left:0 !important;margin-right:0 !important;}" +
+    ".resume-wrapper{width:100% !important;max-width:100% !important;display:block !important;}" +
+    ".paper,article.paper{width:100% !important;max-width:100% !important;margin:0 auto 0 auto !important;border:1px solid #e5e7eb !important;border-bottom-width:2px !important;border-radius:4px !important;}" +
+    ".content-wrapper{padding:0 !important;margin:0 !important;}" +
+    ".page{width:100% !important;max-width:100% !important;min-height:0 !important;margin:0 !important;box-shadow:none !important;padding:24px 14px 18px 16px !important;}" +
+    "#resume{width:100% !important;max-width:100% !important;margin:0 !important;padding:12px 14px !important;box-sizing:border-box !important;border:none !important;box-shadow:none !important;background:#ffffff !important;}" +
+    // Template-specific fixes (these templates enforce fixed page width + gray background)
+    ".resume.talha-professional,.resume.strassburg-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
     "</style>";
   if (typeof html !== "string") return html;
   if (html.includes("<head>")) return html.replace("<head>", "<head>" + style);
@@ -98,18 +109,19 @@ function ResumeCardPreview({ resumeId }) {
       </div>
     );
   }
-  const scale = Math.min(width / A3_W, PREVIEW_H / A3_H, 1);
+  // Fill card width completely to avoid side gutters in preview cards
+  const scale = Math.max(width / A3_W, 0.1);
   const scaledHeight = Math.ceil(scale * A3_H);
   return (
     <div
       ref={containerRef}
       style={{
-        height: scaledHeight,
-        background: "#f1f5f9",
+        height: PREVIEW_H,
         display: "flex",
         alignItems: "flex-start",
-        justifyContent: "center",
+        justifyContent: "flex-start",
         overflow: "hidden",
+        borderRadius: "14px 14px 0 0",
       }}
     >
       <div
@@ -117,9 +129,8 @@ function ResumeCardPreview({ resumeId }) {
           width: A3_W,
           height: A3_H,
           transform: `scale(${scale})`,
-          transformOrigin: "top center",
+          transformOrigin: "top left",
           flexShrink: 0,
-          boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
           overflow: "hidden",
         }}
       >
@@ -156,6 +167,9 @@ export default function TemplateShowcase() {
   const [activeSidebarItem, setActiveSidebarItem] = useState("Profile");
   const [searchQuery, setSearchQuery] = useState("");
   const [showUpload, setShowUpload] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [cancelingSubscription, setCancelingSubscription] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -343,6 +357,37 @@ export default function TemplateShowcase() {
       {path}
     </svg>
   );
+
+  const hasActivePaidSubscription =
+    Boolean(token) &&
+    Boolean(subscriptionStatus?.hasActiveSubscription) &&
+    subscriptionStatus?.plan !== "free";
+
+  const handleCancelSubscription = async () => {
+    const confirmed = await showConfirm(
+      "Are you sure you want to cancel your subscription?\n\nYou will keep premium access until the end of your current billing period."
+    );
+    if (!confirmed) return;
+
+    try {
+      setCancelingSubscription(true);
+      const res = await api.post("/api/v1/billing/cancel");
+      const message =
+        res?.data?.message ||
+        res?.data?.data?.message ||
+        "Subscription canceled successfully.";
+      showToast(message, { type: "success", duration: 5000 });
+
+      const subRes = await api.get("/api/v1/billing/subscription");
+      setSubscriptionStatus(subRes.data?.data || subRes.data || null);
+    } catch (err) {
+      const msg =
+        err.response?.data?.message || "Failed to cancel subscription. Please try again.";
+      showToast(msg, { type: "error" });
+    } finally {
+      setCancelingSubscription(false);
+    }
+  };
 
   return (
     <>
@@ -564,28 +609,56 @@ export default function TemplateShowcase() {
           </div>
         )}
 
-    
         {/* Logout button – at end of sidebar */}
         {token && (
-          <button
-            type="button"
-            onClick={logout}
-            style={{
-              marginTop: "auto",
-              padding: "12px 24px",
-              borderRadius: 8,
-              border: "none",
-              backgroundColor: "#2563eb",
-              color: "#fff",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              boxShadow: "0 10px 25px rgba(37,99,235,0.35)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Logout
-          </button>
+          <>
+            <button
+              type="button"
+              data-variant="error"
+              onClick={() => setShowDeleteAccountModal(true)}
+              style={{
+                marginTop: "auto",
+                background: "#fff",
+                color: "#dc2626",
+                border: "1px solid #fecaca",
+                borderRadius: 12,
+                padding: "12px 16px",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: 12,
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#fef2f2";
+                e.currentTarget.style.borderColor = "#fca5a5";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#fff";
+                e.currentTarget.style.borderColor = "#fecaca";
+              }}
+            >
+              Delete Account
+            </button>
+            <button
+              type="button"
+              onClick={logout}
+              style={{
+                marginTop: 12,
+                padding: "12px 24px",
+                borderRadius: 8,
+                border: "none",
+                backgroundColor: "#2563eb",
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                boxShadow: "0 10px 25px rgba(37,99,235,0.35)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Logout
+            </button>
+          </>
         )}
         </aside>
 
@@ -634,7 +707,7 @@ export default function TemplateShowcase() {
             style={{
               marginTop: 10,
               width: "100%",
-              maxWidth: 860,
+              maxWidth: 960,
               display: "flex",
               alignItems: "center",
               gap: 16,
@@ -807,6 +880,28 @@ export default function TemplateShowcase() {
                   ? "Limit Reached"
                   : "Start with Existing Resume"}
               </button>
+              {hasActivePaidSubscription && (
+                <button
+                  type="button"
+                  onClick={handleCancelSubscription}
+                  disabled={cancelingSubscription}
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: 12,
+                    border: "1px solid #fca5a5",
+                    background: "#fff1f2",
+                    color: "#be123c",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: cancelingSubscription ? "not-allowed" : "pointer",
+                    opacity: cancelingSubscription ? 0.7 : 1,
+                    whiteSpace: "nowrap",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {cancelingSubscription ? "Canceling..." : "Cancel Subscription"}
+                </button>
+              )}
             </div>
           </div>
         </header>
@@ -969,7 +1064,7 @@ export default function TemplateShowcase() {
                   ) : (
                     filteredTemplates.map((t) => {
                       const isPremium = t.category === "premium" || t.category === "industry";
-                      const locked = isPremium && !(subscriptionStatus?.hasActiveSubscription && subscriptionStatus?.plan !== "free");
+                      const locked = false;
                       return (
                         <TemplateCard
                           key={t.slug}
@@ -1206,20 +1301,155 @@ export default function TemplateShowcase() {
               style={{
                 flex: 1,
                 overflow: "auto",
-                padding: 24,
+                padding: 0,
                 minHeight: 400,
+                background: "#fff",
               }}
             >
               <iframe
                 title="Resume preview"
-                srcDoc={selectedResumePreview}
+                srcDoc={injectA3GridPreview(selectedResumePreview || "")}
                 style={{
                   width: "100%",
                   minHeight: 500,
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 8,
+                  border: "none",
+                  borderRadius: 0,
                 }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Account Deletion Confirmation Modal */}
+      {showDeleteAccountModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+          }}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              padding: 24,
+              borderRadius: 16,
+              boxShadow: "0 22px 55px rgba(15,23,42,0.45)",
+              maxWidth: 480,
+              width: "90%",
+            }}
+          >
+            <h2
+              style={{
+                margin: "0 0 8px",
+                fontSize: "var(--font-size-xl)",
+                fontWeight: "var(--font-weight-bold)",
+                color: "#0f172a",
+              }}
+            >
+              Delete your account?
+            </h2>
+            <p
+              style={{
+                margin: "0 0 8px",
+                fontSize: "var(--font-size-sm)",
+                color: "#475569",
+                lineHeight: 1.5,
+              }}
+            >
+              This will immediately sign you out and mark your account for deletion. Your account
+              and all associated data (resumes, templates, billing info) will no longer be
+              accessible in the app.
+            </p>
+            <p
+              style={{
+                margin: "0 0 16px",
+                fontSize: "var(--font-size-xs)",
+                color: "#b91c1c",
+                lineHeight: 1.5,
+              }}
+            >
+              Data may be retained securely for up to 30 days for legal and recovery purposes.
+              After that, it may be permanently removed and cannot be restored.
+            </p>
+            <p
+              style={{
+                margin: "0 0 20px",
+                fontSize: "var(--font-size-xs)",
+                color: "#64748b",
+              }}
+            >
+              If you delete by mistake, contact support within 30 days and we may be able to help
+              restore your account.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 12,
+                marginTop: 8,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowDeleteAccountModal(false)}
+                style={{
+                  padding: "9px 18px",
+                  borderRadius: 999,
+                  border: "1px solid #cbd5e1",
+                  background: "#ffffff",
+                  color: "#0f172a",
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: "var(--font-weight-medium)",
+                  cursor: deletingAccount ? "not-allowed" : "pointer",
+                  opacity: deletingAccount ? 0.6 : 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-variant="error"
+                onClick={async () => {
+                  if (deletingAccount) return;
+                  setDeletingAccount(true);
+                  try {
+                    const res = await api.delete("/api/v1/auth/delete");
+                    const msg =
+                      res?.data?.message ||
+                      res?.data?.data?.message ||
+                      "Account deleted. You have up to 30 days to request restoration.";
+                    showToast(msg, { type: "success", duration: 5000 });
+                    localStorage.clear();
+                    window.location.href = "/signin";
+                  } catch (err) {
+                    console.error(err);
+                    const msg =
+                      err.response?.data?.message ||
+                      "Failed to delete account. Please try again.";
+                    showToast(msg, { type: "error" });
+                    setDeletingAccount(false);
+                  }
+                }}
+                style={{
+                  padding: "9px 20px",
+                  borderRadius: 999,
+                  border: "1px solid #fecaca",
+                  background: "#fee2e2",
+                  color: "#b91c1c",
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: "var(--font-weight-semibold)",
+                  cursor: deletingAccount ? "not-allowed" : "pointer",
+                  opacity: deletingAccount ? 0.7 : 1,
+                }}
+              >
+                {deletingAccount ? "Deleting..." : "Yes, delete my account"}
+              </button>
             </div>
           </div>
         </div>

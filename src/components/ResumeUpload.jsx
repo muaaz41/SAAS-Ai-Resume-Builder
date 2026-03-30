@@ -4,7 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { FileText } from "@phosphor-icons/react";
 
-export default function ResumeUpload({ onClose, selectedTemplateSlug }) {
+export default function ResumeUpload({
+  onClose,
+  selectedTemplateSlug,
+  hideTemplatePicker = false,
+}) {
 const navigate = useNavigate();
 const { token } = useAuth();
 const [file, setFile] = useState(null);
@@ -680,8 +684,8 @@ Remove
 </div>
 )}
 
-{/* Template Selection */}
-{templates.length > 0 && (
+{/* Template Selection (skip when user already picked a template, e.g. resume-start flow) */}
+{templates.length > 0 && !hideTemplatePicker && (
 <div style={{ marginTop: 20, marginBottom: 16 }}>
 <div style={S.sectionLabel}>Choose Template</div>
 <select

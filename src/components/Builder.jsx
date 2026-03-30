@@ -8,6 +8,7 @@ import { ArrowLeft, Eye, Lock } from "lucide-react";
 import { CalendarDots,  LockKeyIcon,  Sparkle } from "@phosphor-icons/react";
 import { showAlert, showConfirm } from "../lib/alert.js";
 import ExportGateModal from "./ExportGateModal.jsx";
+import TemplateCard from "./TemplateCard.jsx";
 import {
   saveResumeToLocal,
   getResumeFromLocal,
@@ -141,6 +142,160 @@ const formatTemplateName = (template) => {
     .join(" ");
 };
 
+function injectTemplatePreviewHtml(html) {
+  if (!html || typeof html !== "string") return html;
+  const css = [
+    "html,body{margin:0 !important;padding:0 !important;background:#fff !important;width:100% !important;max-width:100% !important;overflow-x:hidden !important;}",
+    ".resume-wrapper{width:100% !important;max-width:100% !important;display:block !important;}",
+    ".paper,article.paper{width:100% !important;max-width:100% !important;margin:0 !important;}",
+    ".content-wrapper{padding:0 !important;margin:0 !important;}",
+    ".page{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;}",
+    "#resume{width:100% !important;max-width:100% !important;margin:0 !important;padding:12px 14px !important;border:none !important;box-shadow:none !important;}",
+    ".talha-wrapper,.strassburg-wrapper{max-width:100% !important;width:100% !important;padding:0 !important;margin:0 !important;}",
+  ].join("");
+  if (html.includes("</head>")) return html.replace("</head>", `<style>${css}</style></head>`);
+  if (html.includes("<body")) return html.replace(/<body[^>]*>/i, (m) => `${m}<style>${css}</style>`);
+  return `<style>${css}</style>${html}`;
+}
+
+function BuilderTemplatePreviewModal({ template, onClose, onContinue }) {
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPreview = async () => {
+      try {
+        setLoading(true);
+        if (!template?.slug) {
+          if (!cancelled) setPreviewHtml("<div style='padding:16px;text-align:center'>No template available</div>");
+          return;
+        }
+        const response = await fetch(`/api/v1/templates/${template.slug}/preview`, {
+          method: "GET",
+          headers: { "Content-Type": "text/html" },
+          credentials: "include",
+        });
+        if (!response.ok) throw new Error("Preview unavailable");
+        const html = await response.text();
+        if (!cancelled) setPreviewHtml(html || "");
+      } catch {
+        if (!cancelled) {
+          setPreviewHtml(
+            "<div style='padding:16px;text-align:center;color:#64748b;font-size:13px'>Preview unavailable</div>"
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    loadPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [template?.slug]);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0, 0, 0, 0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 20,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#ffffff",
+          borderRadius: 20,
+          width: "95vw",
+          maxWidth: 900,
+          height: "92vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          boxShadow: "0 25px 60px rgba(0, 0, 0, 0.3)",
+          border: "1px solid #e2e8f0",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            padding: "20px 28px",
+            background: "#f8fafc",
+            borderBottom: "1px solid #e2e8f0",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>
+            {template?.name || "Template Preview"}
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 28, cursor: "pointer", color: "#64748b" }}>
+            ×
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflow: "auto", background: "#fff", padding: 0 }}>
+          {loading ? (
+            <div style={{ minHeight: 300, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
+              Loading preview...
+            </div>
+          ) : (
+            <iframe
+              srcDoc={injectTemplatePreviewHtml(previewHtml)}
+              title="Resume Preview"
+              style={{ width: "100%", height: "100%", minHeight: "calc(92vh - 140px)", border: "none", background: "#fff", display: "block" }}
+              sandbox="allow-same-origin allow-scripts"
+            />
+          )}
+        </div>
+
+        <div style={{ padding: "20px 28px", background: "#f8fafc", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: 12 }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "10px 20px",
+              borderRadius: 12,
+              border: "1px solid #cbd5e1",
+              background: "#fff",
+              color: "#475569",
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            Close
+          </button>
+          <button
+            onClick={() => onContinue?.(template)}
+            style={{
+              padding: "10px 24px",
+              borderRadius: 12,
+              border: "none",
+              background: "#2563eb",
+              color: "#fff",
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+            }}
+          >
+            Use This Template
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Contact + summary field keys that can be restricted per template.
 // Must match backend seed CONTACT_FIELDS (scripts/seed-templates.js).
 const ALL_CONTACT_FIELDS = [
@@ -172,7 +327,9 @@ export default function Builder() {
   // Don't show template dialog if template is already selected from navigation (for both logged-in and non-logged-in users)
   const shouldShowTemplateDialog = startFresh && !navigationState.templateSlug;
   const [showTemplateDialog, setShowTemplateDialog] = useState(shouldShowTemplateDialog);
+  const [showTemplateSwitchDialog, setShowTemplateSwitchDialog] = useState(false);
   const [templateChoice, setTemplateChoice] = useState("");
+  const [templatePreviewTemplate, setTemplatePreviewTemplate] = useState(null);
 
   const resumeIdFromNav = navigationState.resumeId || null;
   const initialResumeId =
@@ -457,6 +614,40 @@ export default function Builder() {
   const isPremiumTemplate = resolvedTemplate?.category === "premium" || resolvedTemplate?.category === "industry";
   // Trial users can edit and preview premium templates, but cannot download them
   const canDownload = !isPremiumTemplate || (hasPaidPlan && !isTrialUser);
+
+  const applyTemplateSelection = async (newTemplate) => {
+    if (!newTemplate?.slug) return;
+
+    setSelectedTemplate(newTemplate);
+
+    // Clear previous preview immediately for better UX
+    if (token && resumeId) {
+      setServerPreview("");
+      setServerPreviewUrl("");
+      if (previewAbortRef.current) {
+        try {
+          previewAbortRef.current.abort();
+        } catch {
+          /* ignore */
+        }
+        previewAbortRef.current = null;
+      }
+      previewInFlightRef.current = false;
+    }
+
+    setResume((r) => ({
+      ...r,
+      templateSlug: newTemplate.slug,
+    }));
+    setTemplateChoice(newTemplate.slug);
+    markTyping();
+
+    // Fetch preview for non-logged-in users (no resumeId)
+    if (!token && !resumeId) {
+      await fetchTemplatePreview(newTemplate.slug);
+    }
+    // For logged-in users, preview is fetched by existing useEffect logic.
+  };
 
   // Helpers to keep experience rich text + bullets in sync
   const bulletsToHtml = (bullets = []) => {
@@ -2571,14 +2762,17 @@ Your progress will be saved. Would you like to upgrade now?`
             alignItems: "center",
             justifyContent: "center",
             zIndex: 50,
+            padding: 20,
           }}>
           <div
             style={{
               background: "#fff",
-              borderRadius: 16,
+              borderRadius: 20,
               padding: 24,
               width: "100%",
-              maxWidth: 480,
+              maxWidth: 1100,
+              maxHeight: "90vh",
+              overflow: "auto",
               boxShadow: "0 10px 40px rgba(15,23,42,0.35)",
             }}>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>
@@ -2594,32 +2788,34 @@ Your progress will be saved. Would you like to upgrade now?`
               Select the template you want to use for this resume. You can
               change it later.
             </p>
-            <label style={{ ...S.label, marginBottom: 6 }}>Template</label>
-            <select
-              value={templateChoice || ""}
-              onChange={(e) => setTemplateChoice(e.target.value)}
+            <div
               style={{
-                ...S.input,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: 16,
                 marginBottom: 16,
-                cursor: "pointer",
               }}>
               {templates.map((t) => {
-                const isPaid =
-                  t.category === "premium" || t.category === "industry";
-                // Don't lock templates - allow trial users to select them
-                // They can edit and preview, but download will be restricted
+                const isPremium = t.category === "premium" || t.category === "industry";
                 return (
-                  <option
+                  <TemplateCard
                     key={t.slug}
-                    value={t.slug}>
-                    {t.name || formatTemplateName(t)}
-                    {t.category === "premium" || t.category === "industry"
-                      ? " (Premium)"
-                      : ""}
-                  </option>
+                    template={t}
+                    isPremium={isPremium}
+                    locked={false}
+                    fullPreview
+                    onSelect={async () => {
+                      await applyTemplateSelection(t);
+                      setShowTemplateDialog(false);
+                      markTyping();
+                    }}
+                    onPreview={(template) => {
+                      setTemplatePreviewTemplate(template);
+                    }}
+                  />
                 );
               })}
-            </select>
+            </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button
                 type="button"
@@ -2634,30 +2830,97 @@ Your progress will be saved. Would you like to upgrade now?`
                 }}>
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showTemplateSwitchDialog && templates.length > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 60,
+            padding: 20,
+          }}>
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              maxWidth: 1100,
+              maxHeight: "90vh",
+              overflow: "auto",
+              boxShadow: "0 10px 40px rgba(15,23,42,0.35)",
+            }}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>
+              Switch template
+            </h2>
+            <p
+              style={{
+                marginTop: 8,
+                marginBottom: 16,
+                fontSize: 14,
+                color: "#64748b",
+              }}>
+              Choose a different template. Your resume data stays the same.
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: 16,
+                marginBottom: 16,
+              }}>
+              {templates.map((t) => {
+                const isPremium = t.category === "premium" || t.category === "industry";
+                return (
+                  <TemplateCard
+                    key={t.slug}
+                    template={t}
+                    isPremium={isPremium}
+                    locked={false}
+                    fullPreview
+                    onSelect={async () => {
+                      await applyTemplateSelection(t);
+                      setShowTemplateSwitchDialog(false);
+                      markTyping();
+                    }}
+                    onPreview={(template) => {
+                      setTemplatePreviewTemplate(template);
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button
                 type="button"
-                style={S.btnSolid}
-                disabled={!templateChoice}
-                onClick={() => {
-                  const slug = templateChoice || templates[0]?.slug;
-                  if (!slug) return;
-                  const tpl =
-                    templates.find((t) => t.slug === slug) || templates[0];
-                  // Allow trial users to select premium templates for editing
-                  // Download restrictions are enforced at download time
-                  setSelectedTemplate(tpl);
-                  setResume((prev) => ({
-                    ...prev,
-                    templateSlug: slug,
-                  }));
-                  setShowTemplateDialog(false);
-                  markTyping();
-                }}>
-                Continue
+                style={S.btnGhost}
+                onClick={() => setShowTemplateSwitchDialog(false)}>
+                Close
               </button>
             </div>
           </div>
         </div>
+      )}
+      {templatePreviewTemplate && (
+        <BuilderTemplatePreviewModal
+          template={templatePreviewTemplate}
+          onClose={() => setTemplatePreviewTemplate(null)}
+          onContinue={(template) => {
+            if (!template?.slug) return;
+            applyTemplateSelection(template);
+            setTemplatePreviewTemplate(null);
+            setShowTemplateDialog(false);
+            setShowTemplateSwitchDialog(false);
+            markTyping();
+          }}
+        />
       )}
       {/* LEFT: Form */}
       <div style={S.left}>
@@ -2728,80 +2991,32 @@ Your progress will be saved. Would you like to upgrade now?`
           ))}
         </div>
 
-        {/* Template Dropdown */}
+        {/* Template Switcher */}
         <div style={{ marginBottom: 14 }}>
           <label style={S.label}>Template *</label>
-          <select
-            value={resume.templateSlug || ""}
-            onChange={async (e) => {
-              const newSlug = e.target.value;
-              if (!newSlug) return;
-              
-              const newTemplate = templates.find((t) => t.slug === newSlug);
-              if (!newTemplate) return;
-              
-              // Allow trial users to select premium templates
-              // Download restrictions are enforced when attempting to download
-              setSelectedTemplate(newTemplate);
-              
-              // Clear previous preview immediately for better UX
-              if (token && resumeId) {
-                setServerPreview("");
-                setServerPreviewUrl("");
-                // Cancel any in-flight preview request for the old template
-                if (previewAbortRef.current) {
-                  try {
-                    previewAbortRef.current.abort();
-                  } catch {
-                    /* ignore */
-                  }
-                  previewAbortRef.current = null;
-                }
-                previewInFlightRef.current = false;
-              }
-              
-              setResume((r) => ({
-                ...r,
-                templateSlug: newSlug,
-              }));
-              markTyping();
-              
-              // Fetch preview for non-logged-in users (no resumeId)
-              if (!token && !resumeId) {
-                await fetchTemplatePreview(newSlug);
-              }
-              // For logged-in users, preview will be fetched via useEffect (with minimal delay for template changes)
-            }}
+          <button
+            type="button"
+            onClick={() => setShowTemplateSwitchDialog(true)}
             style={{
               ...S.input,
+              width: "100%",
+              textAlign: "left",
               cursor: "pointer",
-              appearance: "none",
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "right 12px center",
-              paddingRight: "36px",
-            }}>
-            <option value="" disabled>
-              {hasTemplateSelected ? "Select a different template..." : "Select a template..."}
-            </option>
-            {templates.map((template) => {
-              const isPremium = template.category === "premium" || template.category === "industry";
-              // Allow trial users to select premium templates
-              // Download restrictions are enforced when attempting to download
-              const templateName = formatTemplateName(template);
-              
-              return (
-                <option
-                  key={template.slug}
-                  value={template.slug}
-                  style={{
-                    color: THEME.text,
-                  }}>
-                  {templateName} {isPremium ? "(Premium)" : ""}
-                </option>
-              );
-            })}
-          </select>
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+            }}
+          >
+            <span>
+              {hasTemplateSelected
+                ? `${templateDisplayName || "Current template"}`
+                : "Select a template..."}
+            </span>
+            <span style={{ color: "#64748b", fontSize: 12 }}>
+              Change
+            </span>
+          </button>
           {!hasTemplateSelected && (
             <div
               style={{

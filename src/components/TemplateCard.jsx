@@ -998,54 +998,35 @@ const TemplateCard = ({
 
         <button
           onClick={handleSelect}
-          disabled={locked}
           style={{
             flex: 1,
             padding: "12px 16px",
             borderRadius: "10px",
-            border: locked ? "2px solid #3b82f6" : "none",
-            background: locked
-              ? "#ffffff"
-              : "linear-gradient(135deg, #3b82f6, #1d4ed8)",
-            color: locked ? "#3b82f6" : "white",
+            border: "none",
+            background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+            color: "white",
             fontWeight: "600",
-            cursor: locked ? "pointer" : "pointer",
+            cursor: "pointer",
             transition: "all 0.2s",
             fontSize: "14px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "6px",
-            boxShadow: locked 
-              ? "0 0 0 1px rgba(59, 130, 246, 0.2)" 
-              : "0 2px 8px rgba(59, 130, 246, 0.4)",
+            boxShadow: "0 2px 8px rgba(59, 130, 246, 0.4)",
           }}
           onMouseEnter={(e) => {
             e.target.style.transform = "translateY(-2px)";
-            if (locked) {
-              e.target.style.background = "#eff6ff";
-              e.target.style.boxShadow = "0 4px 14px rgba(59, 130, 246, 0.2)";
-            } else {
-              e.target.style.background = "linear-gradient(135deg, #2563eb, #1e40af)";
-              e.target.style.boxShadow = "0 6px 20px rgba(59, 130, 246, 0.5)";
-            }
+            e.target.style.background = "linear-gradient(135deg, #2563eb, #1e40af)";
+            e.target.style.boxShadow = "0 6px 20px rgba(59, 130, 246, 0.5)";
           }}
           onMouseLeave={(e) => {
             e.target.style.transform = "translateY(0)";
-            if (locked) {
-              e.target.style.background = "#ffffff";
-              e.target.style.boxShadow = "0 0 0 1px rgba(59, 130, 246, 0.2)";
-            } else {
-              e.target.style.background = "linear-gradient(135deg, #3b82f6, #1d4ed8)";
-              e.target.style.boxShadow = "0 2px 8px rgba(59, 130, 246, 0.4)";
-            }
+            e.target.style.background = "linear-gradient(135deg, #3b82f6, #1d4ed8)";
+            e.target.style.boxShadow = "0 2px 8px rgba(59, 130, 246, 0.4)";
           }}>
-          {locked ? (
-            <LockKey size={16} color="#3b82f6" weight="bold" />
-          ) : (
-            <Sparkle size={16} color="white" weight="fill" />
-          )}
-          {locked ? "Upgrade to use" : "Use Template"}
+          <Sparkle size={16} color="white" weight="fill" />
+          Use Template
         </button>
       </div>
       {locked && (

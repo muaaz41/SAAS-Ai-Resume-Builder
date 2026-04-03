@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, FileText, GearSix, ArrowCircleUp, Crown, MagnifyingGlass, Copy } from "phosphor-react";
 import { ShieldCheck, UploadIcon } from "@phosphor-icons/react";
@@ -9,6 +9,11 @@ import { showAlert, showConfirm } from "../lib/alert.js";
 import Footer1 from "./Footer1.jsx";
 import ResumeUpload from "./ResumeUpload.jsx";
 import TemplateCard from "./TemplateCard.jsx";
+import {
+  filterAndSortTemplates,
+  ChooseTemplateModal,
+  UploadFlowTemplatePreviewModal,
+} from "./startExistingResumeUi.jsx";
 
 // A3 grid preview (same as TemplateCard – show full content)
 const A3_W = 842;
@@ -30,6 +35,28 @@ function injectA3GridPreview(html) {
     ".page{width:100% !important;max-width:100% !important;min-height:0 !important;margin:0 !important;box-shadow:none !important;padding:24px 14px 18px 16px !important;}" +
     "#resume{width:100% !important;max-width:100% !important;margin:0 !important;padding:12px 14px !important;box-sizing:border-box !important;border:none !important;box-shadow:none !important;background:#ffffff !important;}" +
     // Template-specific fixes (these templates enforce fixed page width + gray background)
+    ".resume.talha-professional,.resume.strassburg-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
+    "</style>";
+  if (typeof html !== "string") return html;
+  if (html.includes("<head>")) return html.replace("<head>", "<head>" + style);
+  return "<!DOCTYPE html><html><head>" + style + "</head><body>" + html + "</body></html>";
+}
+
+/** Full preview modal: allow vertical scroll inside iframe (card preview uses fixed A3 + overflow hidden). */
+function injectModalResumePreview(html) {
+  const style =
+    "<style>" +
+    "html{height:100%;overflow:hidden;}" +
+    "body{margin:0 !important;padding:0 !important;width:100% !important;min-height:100% !important;height:auto !important;max-height:100% !important;overflow-x:hidden !important;overflow-y:auto !important;box-sizing:border-box;background:#ffffff !important;-webkit-overflow-scrolling:touch;}" +
+    "*{box-sizing:border-box;}" +
+    "body>*{width:100% !important;max-width:100% !important;margin-left:0 !important;margin-right:0 !important;}" +
+    "main,section,article,[class*='container'],[class*='wrapper'],[id*='container'],[id*='wrapper']{max-width:100% !important;}" +
+    "[class*='resume'],[id*='resume']{max-width:100% !important;margin-left:0 !important;margin-right:0 !important;}" +
+    ".resume-wrapper{width:100% !important;max-width:100% !important;display:block !important;}" +
+    ".paper,article.paper{width:100% !important;max-width:100% !important;margin:0 auto 0 auto !important;border:1px solid #e5e7eb !important;border-bottom-width:2px !important;border-radius:4px !important;}" +
+    ".content-wrapper{padding:0 !important;margin:0 !important;}" +
+    ".page{width:100% !important;max-width:100% !important;min-height:0 !important;margin:0 !important;box-shadow:none !important;padding:24px 14px 18px 16px !important;}" +
+    "#resume{width:100% !important;max-width:100% !important;margin:0 !important;padding:12px 14px !important;box-sizing:border-box !important;border:none !important;box-shadow:none !important;background:#ffffff !important;}" +
     ".resume.talha-professional,.resume.strassburg-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
     "</style>";
   if (typeof html !== "string") return html;
@@ -167,6 +194,11 @@ export default function TemplateShowcase() {
   const [activeSidebarItem, setActiveSidebarItem] = useState("Profile");
   const [searchQuery, setSearchQuery] = useState("");
   const [showUpload, setShowUpload] = useState(false);
+  const [uploadTemplateSlug, setUploadTemplateSlug] = useState(null);
+  const [showExistingResumeTemplateModal, setShowExistingResumeTemplateModal] =
+    useState(false);
+  const [existingResumePreviewTemplate, setExistingResumePreviewTemplate] =
+    useState(null);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
@@ -363,6 +395,11 @@ export default function TemplateShowcase() {
     Boolean(subscriptionStatus?.hasActiveSubscription) &&
     subscriptionStatus?.plan !== "free";
 
+  const templatesForExistingResumeFlow = useMemo(
+    () => filterAndSortTemplates(templates),
+    [templates]
+  );
+
   const handleCancelSubscription = async () => {
     const confirmed = await showConfirm(
       "Are you sure you want to cancel your subscription?\n\nYou will keep premium access until the end of your current billing period."
@@ -402,10 +439,41 @@ export default function TemplateShowcase() {
         box-shadow: none !important;
       }
     `}</style>
-    {showUpload && (
+    {showUpload && uploadTemplateSlug && (
       <ResumeUpload
-        onClose={() => setShowUpload(false)}
-        selectedTemplateSlug={null}
+        onClose={() => {
+          setShowUpload(false);
+          setUploadTemplateSlug(null);
+        }}
+        selectedTemplateSlug={uploadTemplateSlug}
+        hideTemplatePicker
+      />
+    )}
+    <ChooseTemplateModal
+      open={showExistingResumeTemplateModal}
+      onClose={() => setShowExistingResumeTemplateModal(false)}
+      templates={templatesForExistingResumeFlow}
+      loading={loading}
+      flow="upload"
+      onPickTemplate={(t) => {
+        setShowExistingResumeTemplateModal(false);
+        setUploadTemplateSlug(t.slug);
+        setShowUpload(true);
+      }}
+      onPreviewTemplate={(tpl) => {
+        setShowExistingResumeTemplateModal(false);
+        setExistingResumePreviewTemplate(tpl);
+      }}
+    />
+    {existingResumePreviewTemplate && (
+      <UploadFlowTemplatePreviewModal
+        template={existingResumePreviewTemplate}
+        onClose={() => setExistingResumePreviewTemplate(null)}
+        onContinue={(t) => {
+          setExistingResumePreviewTemplate(null);
+          setUploadTemplateSlug(t.slug);
+          setShowUpload(true);
+        }}
       />
     )}
     <div
@@ -833,7 +901,13 @@ export default function TemplateShowcase() {
                     );
                     return;
                   }
-                  setShowUpload(true);
+                  if (templatesForExistingResumeFlow.length === 0) {
+                    showToast("No templates available. Please try again later.", {
+                      type: "error",
+                    });
+                    return;
+                  }
+                  setShowExistingResumeTemplateModal(true);
                 }}
                 disabled={token && resumes.length >= 5}
                 style={{
@@ -1226,9 +1300,11 @@ export default function TemplateShowcase() {
               maxWidth: 900,
               width: "100%",
               maxHeight: "90vh",
+              height: "90vh",
               display: "flex",
               flexDirection: "column",
               boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
+              minHeight: 0,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1239,6 +1315,7 @@ export default function TemplateShowcase() {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                flexShrink: 0,
               }}
             >
               <span style={{ fontSize: 16, fontWeight: 600, color: "#0f172a" }}>
@@ -1300,20 +1377,24 @@ export default function TemplateShowcase() {
             <div
               style={{
                 flex: 1,
-                overflow: "auto",
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
                 padding: 0,
-                minHeight: 400,
-                background: "#fff",
+                background: "#f8fafc",
               }}
             >
               <iframe
                 title="Resume preview"
-                srcDoc={injectA3GridPreview(selectedResumePreview || "")}
+                srcDoc={injectModalResumePreview(selectedResumePreview || "")}
+                sandbox="allow-same-origin allow-scripts"
                 style={{
                   width: "100%",
-                  minHeight: 500,
+                  flex: 1,
+                  minHeight: 0,
                   border: "none",
-                  borderRadius: 0,
+                  borderRadius: "0 0 16px 16px",
+                  background: "#fff",
                 }}
               />
             </div>

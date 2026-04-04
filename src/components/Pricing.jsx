@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import priceMan from "../assets/price_man.png";
@@ -15,6 +15,7 @@ import { showConfirm } from "../lib/alert.js";
 
 const Pricing = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState(null); // 'checkout', 'update', 'cancel', 'syncing'
@@ -182,6 +183,19 @@ const Pricing = () => {
       setActivatingPlan(null);
     }
   }, [pendingPlanSelection, subscriptionStatus]);
+
+  // Deep-link from profile: scroll to Cancel Subscription after plan UI mounts (async subscription fetch).
+  useEffect(() => {
+    if (location.hash !== "#cancel-subscription") return;
+    const paid =
+      subscriptionStatus?.hasActiveSubscription && subscriptionStatus?.plan !== "free";
+    if (!paid) return;
+    const id = requestAnimationFrame(() => {
+      const el = document.getElementById("cancel-subscription");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [location.hash, subscriptionStatus]);
 
   const handleCheckout = async (planType) => {
     // Prevent multiple clicks
@@ -710,7 +724,7 @@ const Pricing = () => {
             style={{ height: 62, width: "auto", marginBottom: 16, display: "block" }}
           />
           <div className="ph-cta">
-            <button className="btn-primary">Get Started</button>
+            <a className="btn-primary" href="#plans">Get Started</a>
             <a className="btn-secondary" href="#plans">
               See Plans
             </a>
@@ -860,24 +874,26 @@ const Pricing = () => {
                 : "Get Started"}
             </button>
             {isPlanActive("premium") && (
-              <button
-                className="btn-outline full"
-                onClick={handleCancelSubscription}
-                disabled={isLoading}
-                style={{
-                  marginTop: 8,
-                  opacity:
-                    isLoading && loadingAction === "cancel"
-                      ? 0.7
-                      : isLoading
-                      ? 0.6
-                      : 1,
-                  cursor: isLoading ? "not-allowed" : "pointer",
-                }}>
-                {isLoading && loadingAction === "cancel"
-                  ? "Canceling..."
-                  : "Cancel Subscription"}
-              </button>
+              <div id="cancel-subscription">
+                <button
+                  className="btn-outline full"
+                  onClick={handleCancelSubscription}
+                  disabled={isLoading}
+                  style={{
+                    marginTop: 8,
+                    opacity:
+                      isLoading && loadingAction === "cancel"
+                        ? 0.7
+                        : isLoading
+                        ? 0.6
+                        : 1,
+                    cursor: isLoading ? "not-allowed" : "pointer",
+                  }}>
+                  {isLoading && loadingAction === "cancel"
+                    ? "Canceling..."
+                    : "Cancel Subscription"}
+                </button>
+              </div>
             )}
             <div className="feat-title">What You'll Get</div>
             <ul className="feat-list">
@@ -970,24 +986,26 @@ const Pricing = () => {
                 : "Get Started"}
             </button>
             {isPlanActive("professional") && (
-              <button
-                className="btn-outline full"
-                onClick={handleCancelSubscription}
-                disabled={isLoading}
-                style={{
-                  marginTop: 8,
-                  opacity:
-                    isLoading && loadingAction === "cancel"
-                      ? 0.7
-                      : isLoading
-                      ? 0.6
-                      : 1,
-                  cursor: isLoading ? "not-allowed" : "pointer",
-                }}>
-                {isLoading && loadingAction === "cancel"
-                  ? "Canceling..."
-                  : "Cancel Subscription"}
-              </button>
+              <div id="cancel-subscription">
+                <button
+                  className="btn-outline full"
+                  onClick={handleCancelSubscription}
+                  disabled={isLoading}
+                  style={{
+                    marginTop: 8,
+                    opacity:
+                      isLoading && loadingAction === "cancel"
+                        ? 0.7
+                        : isLoading
+                        ? 0.6
+                        : 1,
+                    cursor: isLoading ? "not-allowed" : "pointer",
+                  }}>
+                  {isLoading && loadingAction === "cancel"
+                    ? "Canceling..."
+                    : "Cancel Subscription"}
+                </button>
+              </div>
             )}
             <div className="feat-title">What You'll Get</div>
             <ul className="feat-list">

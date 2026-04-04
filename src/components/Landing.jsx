@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import peopleImg from "../assets/people.png";
 import personImg from "../assets/resume_man.png";
 import brandsImg from "../assets/List_Companies.png";
@@ -35,11 +35,116 @@ import { MagnifyingGlass } from "@phosphor-icons/react";
 import { showToast } from "../lib/toast";
 import { api } from "../lib/api.js";
 
+const A3_WIDTH = 842;
+const A3_HEIGHT = 1191;
+
+function injectA3CardPreview(html) {
+  const style =
+    "<style>" +
+    "html,body{margin:0 !important;padding:0 !important;width:842px;min-height:1191px;height:1191px;overflow:hidden;box-sizing:border-box;scrollbar-width:none;-ms-overflow-style:none;background:#ffffff !important;}" +
+    "html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;}" +
+    "*{box-sizing:border-box;}" +
+    "body>*{width:100% !important;max-width:100% !important;margin-left:0 !important;margin-right:0 !important;}" +
+    "main,section,article,[class*='container'],[class*='wrapper'],[id*='container'],[id*='wrapper']{max-width:100% !important;}" +
+    "[class*='resume'],[id*='resume']{max-width:100% !important;margin-left:0 !important;margin-right:0 !important;}" +
+    ".resume-wrapper{width:100% !important;max-width:100% !important;display:block !important;}" +
+    ".paper,article.paper{width:100% !important;max-width:100% !important;margin:0 auto 0 auto !important;border:none !important;border-radius:0 !important;}" +
+    ".content-wrapper{padding:0 !important;margin:0 !important;}" +
+    ".page{width:100% !important;max-width:100% !important;min-height:0 !important;margin:0 !important;box-shadow:none !important;padding:24px 14px 18px 16px !important;}" +
+    "#resume{width:100% !important;max-width:100% !important;margin:0 !important;padding:12px 14px !important;box-sizing:border-box !important;border:none !important;box-shadow:none !important;background:#ffffff !important;}" +
+    ".resume.talha-professional,.resume.strassburg-professional,.resume.pro-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
+    "</style>";
+  if (typeof html !== "string") return html;
+  if (html.includes("<head>")) return html.replace("<head>", "<head>" + style);
+  return "<!DOCTYPE html><html><head>" + style + "</head><body>" + html + "</body></html>";
+}
+
 const Landing = () => {
   const [showAllTemplates, setShowAllTemplates] = useState(false);
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [newsletterLoading, setNewsletterLoading] = useState(false);
+  const [featuredTemplates, setFeaturedTemplates] = useState([]);
   const navigate = useNavigate();
+
+  const FEATURED_TEMPLATE_CONFIG = [
+    { slug: "talha-professional", name: "Talha Professional", fallbackImage: resumeImg },
+    { slug: "tech-stack", name: "Tech Stack", fallbackImage: resume3 },
+    { slug: "strassburg-professional", name: "Strassburg Professional", fallbackImage: resume2 },
+  ];
+
+  const resolveTemplateAssetUrl = (rawValue) => {
+    if (!rawValue || typeof rawValue !== "string") return null;
+    const url = rawValue.trim();
+    if (/^https?:\/\//i.test(url)) return url;
+    if (url.startsWith("/api/")) return url;
+    if (url.startsWith("/")) return url;
+    return `/api/v1/${url.replace(/^\/+/, "")}`;
+  };
+
+  const handleTemplatePick = (templateSlug) => {
+    if (!templateSlug) return;
+    navigate("/builder", {
+      state: { startFresh: true, templateSlug },
+    });
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchFeaturedTemplates = async () => {
+      try {
+        const response = await api.get("/api/v1/templates/public");
+        const items = response.data?.data?.items || [];
+        const bySlug = new Map(items.map((item) => [item.slug, item]));
+
+        const ordered = FEATURED_TEMPLATE_CONFIG.map((cfg) => {
+          const template = bySlug.get(cfg.slug);
+          return {
+            slug: cfg.slug,
+            name: template?.name || cfg.name,
+            previewFrameSrc: resolveTemplateAssetUrl(template?.previewUrl),
+            imageSrc: resolveTemplateAssetUrl(template?.thumbnailUrl),
+            previewHtml: null,
+            fallbackImage: cfg.fallbackImage,
+          };
+        });
+
+        const withPreviewHtml = await Promise.all(
+          ordered.map(async (template) => {
+            if (!template.previewFrameSrc) return template;
+            try {
+              const res = await fetch(template.previewFrameSrc);
+              if (!res.ok) return template;
+              const html = await res.text();
+              return { ...template, previewHtml: html };
+            } catch {
+              return template;
+            }
+          })
+        );
+
+        if (isMounted) setFeaturedTemplates(withPreviewHtml);
+      } catch (error) {
+        if (isMounted) {
+          setFeaturedTemplates(
+            FEATURED_TEMPLATE_CONFIG.map((cfg) => ({
+              slug: cfg.slug,
+              name: cfg.name,
+              previewFrameSrc: null,
+              imageSrc: null,
+              previewHtml: null,
+              fallbackImage: cfg.fallbackImage,
+            }))
+          );
+        }
+      }
+    };
+
+    fetchFeaturedTemplates();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleNewsletterSubmit = async (e) => {
     e.preventDefault();
@@ -336,62 +441,83 @@ const Landing = () => {
         </p>
 
         <div className="templates-grid">
-          <div className="template-card">
-            <img
-              src={resumeImg}
-              alt="Resume Template 1"
-              className="template-img"
-            />
-            <div className="template-footer">
-              <div className="template-tag">
-                Type<span>Modern</span>
-              </div>
-              <div className="template-tag">
-                Color<span>White</span>
-              </div>
-              <div className="template-tag">
-                Format<span>Adjustable</span>
+          {(featuredTemplates.length > 0 ? featuredTemplates : FEATURED_TEMPLATE_CONFIG.map((cfg) => ({
+            slug: cfg.slug,
+            name: cfg.name,
+            previewFrameSrc: null,
+            imageSrc: null,
+            previewHtml: null,
+            fallbackImage: cfg.fallbackImage,
+          }))).map((template, idx) => (
+            <div
+              key={template.slug}
+              className="template-card"
+              onClick={() => handleTemplatePick(template.slug)}
+              style={{ cursor: "pointer" }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleTemplatePick(template.slug);
+                }
+              }}
+              aria-label={`Use ${template.name} template`}>
+              {template.previewHtml ? (
+                <div
+                  className="template-img"
+                  style={{
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "flex-start",
+                    background: "#fff",
+                  }}>
+                  <div
+                    style={{
+                      width: A3_WIDTH,
+                      height: A3_HEIGHT,
+                      transform: "scale(0.46)",
+                      transformOrigin: "top left",
+                      flexShrink: 0,
+                      overflow: "hidden",
+                    }}>
+                    <iframe
+                      title={`${template.name} template preview`}
+                      srcDoc={injectA3CardPreview(template.previewHtml)}
+                      sandbox="allow-same-origin"
+                      loading="lazy"
+                      style={{
+                        width: A3_WIDTH,
+                        height: A3_HEIGHT,
+                        border: 0,
+                        display: "block",
+                        pointerEvents: "none",
+                        background: "#fff",
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={template.imageSrc}
+                  alt={`${template.name} template preview`}
+                  className="template-img"
+                />
+              )}
+              <div className="template-footer">
+                <div className="template-tag">
+                  Type<span>{idx === 1 ? "Classic" : "Modern"}</span>
+                </div>
+                <div className="template-tag">
+                  Color<span>White</span>
+                </div>
+                <div className="template-tag">
+                  Format<span>Adjustable</span>
+                </div>
               </div>
             </div>
-          </div>
-
-          <div className="template-card">
-            <img
-              src={resume3}
-              alt="Resume Template 2"
-              className="template-img"
-            />
-            <div className="template-footer">
-              <div className="template-tag">
-                Type<span>Classic</span>
-              </div>
-              <div className="template-tag">
-                Color<span>White</span>
-              </div>
-              <div className="template-tag">
-                Format<span>Adjustable</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="template-card">
-            <img
-              src={resume2}
-              alt="Resume Template 3"
-              className="template-img"
-            />
-            <div className="template-footer">
-              <div className="template-tag">
-                Type<span>Modern</span>
-              </div>
-              <div className="template-tag">
-                Color<span>White</span>
-              </div>
-              <div className="template-tag">
-                Format<span>Adjustable</span>
-              </div>
-            </div>
-          </div>
+          ))}
 
           {/* {showAllTemplates && (
             <>
@@ -652,7 +778,9 @@ const Landing = () => {
           <h3 className="nl-headline">
             Save TimeBuild Your Resume Instantly with Resume Now’s AI Tool
           </h3>
-          <button className="nl-cta">Make New Resume</button>
+          <button className="nl-cta" onClick={() => navigate("/builder")}>
+            Make New Resume
+          </button>
           {/* <svg className="nl-line" width="120" height="60" viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M8 50 C 40 10, 80 10, 112 26" stroke="white" strokeWidth="4" strokeLinecap="round" fill="none"/>
             <path d="M112 26 l-10 -4 m10 4 l-8 8" stroke="white" strokeWidth="4" strokeLinecap="round" fill="none"/>

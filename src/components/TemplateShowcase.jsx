@@ -35,7 +35,7 @@ function injectA3GridPreview(html) {
     ".page{width:100% !important;max-width:100% !important;min-height:0 !important;margin:0 !important;box-shadow:none !important;padding:24px 14px 18px 16px !important;}" +
     "#resume{width:100% !important;max-width:100% !important;margin:0 !important;padding:12px 14px !important;box-sizing:border-box !important;border:none !important;box-shadow:none !important;background:#ffffff !important;}" +
     // Template-specific fixes (these templates enforce fixed page width + gray background)
-    ".resume.talha-professional,.resume.strassburg-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
+    ".resume.talha-professional,.resume.strassburg-professional,.resume.pro-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
     "</style>";
   if (typeof html !== "string") return html;
   if (html.includes("<head>")) return html.replace("<head>", "<head>" + style);
@@ -57,7 +57,7 @@ function injectModalResumePreview(html) {
     ".content-wrapper{padding:0 !important;margin:0 !important;}" +
     ".page{width:100% !important;max-width:100% !important;min-height:0 !important;margin:0 !important;box-shadow:none !important;padding:24px 14px 18px 16px !important;}" +
     "#resume{width:100% !important;max-width:100% !important;margin:0 !important;padding:12px 14px !important;box-sizing:border-box !important;border:none !important;box-shadow:none !important;background:#ffffff !important;}" +
-    ".resume.talha-professional,.resume.strassburg-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
+    ".resume.talha-professional,.resume.strassburg-professional,.resume.pro-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
     "</style>";
   if (typeof html !== "string") return html;
   if (html.includes("<head>")) return html.replace("<head>", "<head>" + style);
@@ -201,7 +201,6 @@ export default function TemplateShowcase() {
     useState(null);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const [cancelingSubscription, setCancelingSubscription] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -399,32 +398,6 @@ export default function TemplateShowcase() {
     () => filterAndSortTemplates(templates),
     [templates]
   );
-
-  const handleCancelSubscription = async () => {
-    const confirmed = await showConfirm(
-      "Are you sure you want to cancel your subscription?\n\nYou will keep premium access until the end of your current billing period."
-    );
-    if (!confirmed) return;
-
-    try {
-      setCancelingSubscription(true);
-      const res = await api.post("/api/v1/billing/cancel");
-      const message =
-        res?.data?.message ||
-        res?.data?.data?.message ||
-        "Subscription canceled successfully.";
-      showToast(message, { type: "success", duration: 5000 });
-
-      const subRes = await api.get("/api/v1/billing/subscription");
-      setSubscriptionStatus(subRes.data?.data || subRes.data || null);
-    } catch (err) {
-      const msg =
-        err.response?.data?.message || "Failed to cancel subscription. Please try again.";
-      showToast(msg, { type: "error" });
-    } finally {
-      setCancelingSubscription(false);
-    }
-  };
 
   return (
     <>
@@ -957,8 +930,7 @@ export default function TemplateShowcase() {
               {hasActivePaidSubscription && (
                 <button
                   type="button"
-                  onClick={handleCancelSubscription}
-                  disabled={cancelingSubscription}
+                  onClick={() => navigate("/pricing#cancel-subscription")}
                   style={{
                     padding: "12px 16px",
                     borderRadius: 12,
@@ -967,13 +939,12 @@ export default function TemplateShowcase() {
                     color: "#be123c",
                     fontSize: 13,
                     fontWeight: 700,
-                    cursor: cancelingSubscription ? "not-allowed" : "pointer",
-                    opacity: cancelingSubscription ? 0.7 : 1,
+                    cursor: "pointer",
                     whiteSpace: "nowrap",
                     transition: "all 0.2s ease",
                   }}
                 >
-                  {cancelingSubscription ? "Canceling..." : "Cancel Subscription"}
+                  Cancel Subscription
                 </button>
               )}
             </div>

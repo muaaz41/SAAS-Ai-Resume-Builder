@@ -52,7 +52,7 @@ function injectA3CardPreview(html) {
     ".content-wrapper{padding:0 !important;margin:0 !important;}" +
     ".page{width:100% !important;max-width:100% !important;min-height:0 !important;margin:0 !important;box-shadow:none !important;padding:24px 14px 18px 16px !important;}" +
     "#resume{width:100% !important;max-width:100% !important;margin:0 !important;padding:12px 14px !important;box-sizing:border-box !important;border:none !important;box-shadow:none !important;background:#ffffff !important;}" +
-    ".resume.talha-professional,.resume.strassburg-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
+    ".resume.talha-professional,.resume.strassburg-professional,.resume.pro-professional{width:100% !important;max-width:100% !important;margin:0 !important;box-shadow:none !important;border:none !important;}" +
     "</style>";
   if (typeof html !== "string") return html;
   if (html.includes("<head>")) return html.replace("<head>", "<head>" + style);
@@ -500,7 +500,7 @@ const Landing = () => {
                 </div>
               ) : (
                 <img
-                  src={template.imageSrc || template.fallbackImage}
+                  src={template.imageSrc}
                   alt={`${template.name} template preview`}
                   className="template-img"
                 />

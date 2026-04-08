@@ -232,7 +232,7 @@ const Pricing = () => {
 
     setLoading(true);
     setLoadingAction("checkout");
-    showToast("Preparing checkout...", { type: "info", duration: 2000 });
+    showToast("Preparing checkout...", { type: "success", duration: 2000 });
 
     try {
       const priceId = PRICE_IDS[planType];
@@ -246,7 +246,7 @@ const Pricing = () => {
       }
 
       showToast("Creating checkout session...", {
-        type: "info",
+        type: "success",
         duration: 2000,
       });
       const response = await api.post("/api/v1/billing/checkout", { priceId });

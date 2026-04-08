@@ -393,6 +393,13 @@ export default function TemplateShowcase() {
     Boolean(token) &&
     Boolean(subscriptionStatus?.hasActiveSubscription) &&
     subscriptionStatus?.plan !== "free";
+  const currentPlanName = subscriptionStatus?.plan
+    ? subscriptionStatus.plan.charAt(0).toUpperCase() +
+      subscriptionStatus.plan.slice(1)
+    : "Free";
+  const formattedPeriodEnd = subscriptionStatus?.currentPeriodEnd
+    ? new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString()
+    : null;
 
   const templatesForExistingResumeFlow = useMemo(
     () => filterAndSortTemplates(templates),
@@ -589,8 +596,8 @@ export default function TemplateShowcase() {
             })}
           </nav>
 
-        {/* Upgrade card — only for non‑premium users */}
-        {token && (!subscriptionStatus?.hasActiveSubscription || subscriptionStatus?.plan === "free") && (
+        {/* Subscription card */}
+        {token && (
           <div
             style={{
               marginTop: 16,
@@ -607,46 +614,126 @@ export default function TemplateShowcase() {
             <div style={{ marginBottom: 12 }}>
               <Crown size={44} color="#2563eb" />
             </div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: 18,
-                fontWeight: 700,
-                color: "#1f2937",
-                marginBottom: 8,
-              }}
-            >
-              Upgrade to Pro
-            </h3>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 13,
-                color: "#6b7280",
-                lineHeight: 1.4,
-                marginBottom: 18,
-              }}
-            >
-              Unlock unlimited resumes and premium templates
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate("/pricing")}
-              style={{
-                padding: "12px 28px",
-                borderRadius: 12,
-                border: "none",
-                background: "#2563eb",
-                color: "#fff",
-                fontSize: 14,
-                fontWeight: 700,
-                cursor: "pointer",
-                width: "100%",
-                maxWidth: 200,
-              }}
-            >
-              Upgrade Now
-            </button>
+            {!hasActivePaidSubscription ? (
+              <>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "#1f2937",
+                    marginBottom: 8,
+                  }}
+                >
+                  Upgrade to Pro
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 13,
+                    color: "#6b7280",
+                    lineHeight: 1.4,
+                    marginBottom: 18,
+                  }}
+                >
+                  Unlock unlimited resumes and premium templates
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate("/pricing")}
+                  style={{
+                    padding: "12px 28px",
+                    borderRadius: 12,
+                    border: "none",
+                    background: "#2563eb",
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    width: "100%",
+                    maxWidth: 200,
+                  }}
+                >
+                  Upgrade Now
+                </button>
+              </>
+            ) : (
+              <>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "#1f2937",
+                    marginBottom: 8,
+                  }}
+                >
+                  {currentPlanName} Plan
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 13,
+                    color: "#6b7280",
+                    lineHeight: 1.4,
+                    marginBottom: 6,
+                  }}
+                >
+                  Status: Active
+                </p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 12,
+                    color: "#6b7280",
+                    lineHeight: 1.4,
+                    marginBottom: 18,
+                  }}
+                >
+                  {formattedPeriodEnd
+                    ? `Renews on ${formattedPeriodEnd}`
+                    : "You have premium access enabled"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate("/pricing#cancel-subscription")}
+                  style={{
+                    padding: "12px 28px",
+                    borderRadius: 12,
+                    border: "none",
+                    background: "#2563eb",
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    width: "100%",
+                    maxWidth: 200,
+                  }}
+                >
+                  Manage Plan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/pricing#cancel-subscription")}
+                  style={{
+                    marginTop: 10,
+                    padding: "12px 16px",
+                    borderRadius: 12,
+                    border: "1px solid #fca5a5",
+                    background: "#fff1f2",
+                    color: "#be123c",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    width: "100%",
+                    maxWidth: 200,
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  Cancel Subscription
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -927,26 +1014,6 @@ export default function TemplateShowcase() {
                   ? "Limit Reached"
                   : "Start with Existing Resume"}
               </button>
-              {hasActivePaidSubscription && (
-                <button
-                  type="button"
-                  onClick={() => navigate("/pricing#cancel-subscription")}
-                  style={{
-                    padding: "12px 16px",
-                    borderRadius: 12,
-                    border: "1px solid #fca5a5",
-                    background: "#fff1f2",
-                    color: "#be123c",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  Cancel Subscription
-                </button>
-              )}
             </div>
           </div>
         </header>

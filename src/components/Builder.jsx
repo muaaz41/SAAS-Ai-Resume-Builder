@@ -7516,9 +7516,10 @@ export default function Builder() {
       );
 
       let res;
+      let urlToUse = proxiedUrl;
       try {
-        // Try the direct backend URL first (faster in development)
-        const urlToUse = isLocal ? directUrl : proxiedUrl;
+        // In local dev, prefer proxied local backend so latest backend code is used.
+        urlToUse = isLocal ? proxiedUrl : proxiedUrl;
         res = await api.get(urlToUse, {
           responseType: format === "txt" ? "text" : "blob",
           timeout: 30000, // Reduced from 60s to 30s since we optimized PDF generation
@@ -7526,11 +7527,12 @@ export default function Builder() {
         });
       } catch (firstErr) {
         console.warn(
-          "Direct export failed, retrying via proxied URL:",
+          "Primary export URL failed, retrying fallback URL:",
           firstErr?.message || firstErr
         );
-        // Fallback to proxied path with shorter timeout
-        res = await api.get(proxiedUrl, {
+        // Fallback to direct backend (useful if local backend is not running)
+        const fallbackUrl = urlToUse === proxiedUrl ? directUrl : proxiedUrl;
+        res = await api.get(fallbackUrl, {
           responseType: format === "txt" ? "text" : "blob",
           timeout: 30000, // Reduced timeout
           withCredentials: true,
@@ -7564,19 +7566,22 @@ export default function Builder() {
         } catch {}
       }
 
-      // Build the file blob
-      const mimeType =
-        format === "pdf"
-          ? "application/pdf"
-          : format === "doc"
-          ? "application/msword"
-          : format === "docx"
-          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          : "text/plain";
-
       // If server sent HTML/JSON error, surface it before saving a bad file
       const headerCT =
         res.headers?.["content-type"] || res.headers?.get?.("content-type");
+      const effectiveFormat =
+        format === "doc" && headerCT?.includes("wordprocessingml") ? "docx" : format;
+
+      // Build the file blob
+      const mimeType =
+        effectiveFormat === "pdf"
+          ? "application/pdf"
+          : effectiveFormat === "doc"
+          ? "application/msword"
+          : effectiveFormat === "docx"
+          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          : "text/plain";
+
       if (
         format !== "txt" &&
         headerCT &&
@@ -7617,7 +7622,7 @@ export default function Builder() {
             b[4] === 0x2d
           );
         // DOC is HTML; DOCX is a ZIP (PK..). We only validate DOCX here.
-        const badDocx = format === "docx" && !(b[0] === 0x50 && b[1] === 0x4b);
+        const badDocx = effectiveFormat === "docx" && !(b[0] === 0x50 && b[1] === 0x4b);
         if (badPdf || badDocx) {
           console.warn("Unexpected file header:", Array.from(b));
           // Fallback: some backends send JSON object of numeric keys {"0":137,"1":80,...}
@@ -7669,11 +7674,14 @@ export default function Builder() {
         // ignore header check failures
       }
 
-      // Check file size BEFORE downloading to avoid double downloads
-      // Fallback for DOCX/DOC that looks too small (often summary-only)
-      if ((format === "docx" || format === "doc") && (fileBlob?.size || 0) < 12000) {
+      // Check file size BEFORE downloading to avoid double downloads.
+      // Keep fallback only for legacy DOC exports.
+      if (
+        effectiveFormat === "doc" &&
+        (fileBlob?.size || 0) < 12000
+      ) {
         console.warn(
-          "[Export] DOCX/DOC blob appears small (",
+          "[Export] DOC blob appears small (",
           fileBlob?.size,
           ") — falling back to client Word .doc export."
         );
@@ -7691,7 +7699,7 @@ export default function Builder() {
       const safeTitle =
         (resume.title || "resume").replace(/[^\w\-\s]+/g, "").trim() ||
         "resume";
-      a.download = `${safeTitle}-${Date.now()}.${format}`;
+      a.download = `${safeTitle}-${Date.now()}.${effectiveFormat}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -11160,10 +11168,10 @@ function CompletionModal({
                 </button>
                 <button
                   style={S.btnSolid}
-                  onClick={() => onExport("doc")}
-                  disabled={exporting && exportingFormat === "doc"}
+                  onClick={() => onExport("docx")}
+                  disabled={exporting && exportingFormat === "docx"}
                 >
-                  {exporting && exportingFormat === "doc" ? "Exporting DOC..." : "Download Word"}
+                  {exporting && exportingFormat === "docx" ? "Exporting DOCX..." : "Download Word"}
                 </button>
                 <button
                   style={S.btnSolid}

@@ -6233,20 +6233,18 @@ export default function Builder() {
 
     setSelectedTemplate(newTemplate);
 
-    // Clear previous preview immediately for better UX
-    if (token && resumeId) {
-      setServerPreview("");
-      setServerPreviewUrl("");
-      if (previewAbortRef.current) {
-        try {
-          previewAbortRef.current.abort();
-        } catch {
-          /* ignore */
-        }
-        previewAbortRef.current = null;
+    // Clear previous preview immediately to avoid showing stale template HTML.
+    setServerPreview("");
+    setServerPreviewUrl("");
+    if (previewAbortRef.current) {
+      try {
+        previewAbortRef.current.abort();
+      } catch {
+        /* ignore */
       }
-      previewInFlightRef.current = false;
+      previewAbortRef.current = null;
     }
+    previewInFlightRef.current = false;
 
     setResume((r) => ({
       ...r,
@@ -8014,8 +8012,27 @@ Your progress will be saved. Would you like to upgrade now?`
       const delay = isTemplateChange ? 50 : 2000; // 50ms for template change (almost immediate), 2s for other changes
 
       const timeoutId = setTimeout(() => {
-        // Skip rate limiting for template changes to ensure immediate fetch
-        fetchServerPreview(isTemplateChange);
+        // On template switch, render from current in-memory resume data.
+        // This avoids stale previews caused by autosave/DB lag.
+        if (isTemplateChange) {
+          setIsTemplateLoading(true);
+          const resumeDataForRender = {
+            contact: resume.contact || {},
+            experience: resume.experience || [],
+            education: resume.education || [],
+            skills: resume.skills || [],
+            projects: resume.projects || [],
+            hobbies: resume.hobbies || [],
+            awards: resume.awards || [],
+          };
+          fetchTemplatePreview(resume.templateSlug, resumeDataForRender).finally(() => {
+            setIsTemplateLoading(false);
+          });
+          return;
+        }
+
+        // For non-template edits, keep existing server preview flow.
+        fetchServerPreview(false);
       }, delay);
 
       return () => clearTimeout(timeoutId);
